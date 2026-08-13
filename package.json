@@ -1,0 +1,51 @@
+{
+  "name": "wedding-hall-booking",
+  "version": "1.0.0",
+  "description": "نظام حجوزات قاعة الأعراس",
+  "main": "main.js",
+  "author": "Ibrahim",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.ibrahim.weddinghallbooking",
+    "productName": "نظام حجوزات القاعة",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "remote-access.js",
+      "index.html",
+      "renderer.js",
+      "style.css",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "language": "1025"
+    }
+  }
+}

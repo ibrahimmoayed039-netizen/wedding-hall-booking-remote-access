@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>نظام حجوزات القاعة</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon">💍</span>
+        <span id="hallTitle">نظام حجوزات القاعة</span>
+      </div>
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="bookings">الحجوزات</button>
+        <button class="tab-btn" data-tab="newBooking">حجز جديد</button>
+        <button class="tab-btn" data-tab="availability">التوفر الشهري</button>
+        <button class="tab-btn" data-tab="reports">التقارير</button>
+        <button class="tab-btn" data-tab="settings">الإعدادات</button>
+      </nav>
+    </header>
+
+    <main class="content">
+
+      <!-- ===== Tab: Bookings List ===== -->
+      <section id="tab-bookings" class="tab-panel active">
+        <div class="panel-toolbar">
+          <input type="text" id="searchInput" placeholder="بحث بالاسم أو رقم الهاتف...">
+          <input type="date" id="filterDate" title="تصفية حسب تاريخ الحجز">
+          <button id="clearFilters" class="btn btn-light">إعادة تعيين</button>
+        </div>
+        <div class="table-wrap">
+          <table id="bookingsTable">
+            <thead>
+              <tr>
+                <th data-sort-key="customerName">اسم العميل</th>
+                <th data-sort-key="phone">الهاتف</th>
+                <th data-sort-key="eventDate">تاريخ الحفلة</th>
+                <th data-sort-key="totalAmount">المبلغ</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="bookingsTableBody"></tbody>
+          </table>
+          <p id="emptyState" class="empty-state" style="display:none;">لا توجد حجوزات بعد. اذهب لتبويب "حجز جديد" لإضافة أول حجز.</p>
+        </div>
+      </section>
+
+      <!-- ===== Tab: New / Edit Booking ===== -->
+      <section id="tab-newBooking" class="tab-panel">
+        <form id="bookingForm" class="form-card">
+          <input type="hidden" id="bookingId">
+          <h2 id="formTitle">حجز جديد</h2>
+
+          <div class="form-grid">
+            <div class="field">
+              <label>اسم العميل *</label>
+              <input type="text" id="customerName" required>
+            </div>
+            <div class="field">
+              <label>رقم الهاتف *</label>
+              <input type="tel" id="phone" required>
+            </div>
+            <div class="field full">
+              <label>تاريخ الحفلة *</label>
+              <input type="date" id="eventDate" required>
+            </div>
+            <div class="field">
+              <label>كادر التصوير</label>
+              <select id="photographerType">
+                <option value="ضمن القاعة">ضمن القاعة</option>
+                <option value="خارجي">خارجي</option>
+              </select>
+            </div>
+            <div class="field" id="photographerNameField" style="display:none;">
+              <label>اسم كادر التصوير</label>
+              <input type="text" id="photographerName">
+            </div>
+            <div class="field">
+              <label>الديجي</label>
+              <select id="djType">
+                <option value="ضمن القاعة">ضمن القاعة</option>
+                <option value="خارجي">خارجي</option>
+              </select>
+            </div>
+            <div class="field" id="djNameField" style="display:none;">
+              <label>اسم الديجي</label>
+              <input type="text" id="djName">
+            </div>
+            <div class="field">
+              <label>المنسقة</label>
+              <select id="coordinatorType">
+                <option value="ضمن القاعة">ضمن القاعة</option>
+                <option value="خارجي">خارجي</option>
+              </select>
+            </div>
+            <div class="field" id="coordinatorNameField" style="display:none;">
+              <label>اسم المنسقة</label>
+              <input type="text" id="coordinatorName">
+            </div>
+            <div class="field">
+              <label>عدد المساعدين/المنظمين</label>
+              <input type="number" id="assistantsCount" min="0" step="1" value="0">
+            </div>
+            <div class="field">
+              <label>تحضير الطعام *</label>
+              <select id="foodLocation">
+                <option value="خارج القاعة">خارج القاعة</option>
+                <option value="داخل القاعة">داخل القاعة</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>طريقة الدفع *</label>
+              <select id="paymentType">
+                <option value="نقد">نقد (دفع كامل)</option>
+                <option value="عربون">عربون</option>
+                <option value="أقساط">أقساط</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>سعر الحجز (ر.س) *</label>
+              <input type="number" id="hallPrice" min="0" step="1" value="0" required>
+            </div>
+            <div class="field">
+              <label>المبلغ الإجمالي (ر.س)</label>
+              <input type="number" id="totalAmount" min="0" step="1" readonly>
+              <small class="field-hint">يُحسب تلقائياً: سعر الحجز + إجمالي باكجات الطعام</small>
+            </div>
+            <div class="field" id="paidAmountField">
+              <label id="paidAmountLabel">المبلغ المدفوع (ر.س)</label>
+              <input type="number" id="paidAmount" min="0" step="1" value="0">
+            </div>
+          </div>
+
+          <div id="installmentsSection" style="display:none;">
+            <div class="installments-header">
+              <h3>جدول الأقساط</h3>
+              <button type="button" id="addInstallmentBtn" class="btn btn-light">+ إضافة قسط</button>
+            </div>
+            <table id="installmentsTable">
+              <thead>
+                <tr><th>المبلغ (ر.س)</th><th>تاريخ الاستحقاق</th><th>الحالة</th><th></th></tr>
+              </thead>
+              <tbody id="installmentsBody"></tbody>
+            </table>
+          </div>
+
+          <div id="foodPackagesSection" style="display:none;">
+            <div class="installments-header">
+              <h3>باكجات الطعام (داخل القاعة)</h3>
+              <span class="field-hint">حدد عدد القطع لكل باكج</span>
+            </div>
+            <div id="foodPackagesChecklist" class="food-packages-checklist"></div>
+            <p id="foodPackagesTotal" class="empty-state" style="display:none; padding:10px; text-align:right;"></p>
+          </div>
+
+          <div class="field full">
+            <label>ملاحظات</label>
+            <textarea id="notes" rows="3"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">حفظ الحجز</button>
+            <button type="button" id="resetFormBtn" class="btn btn-light">إلغاء / حجز جديد</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ===== Tab: Monthly Availability ===== -->
+      <section id="tab-availability" class="tab-panel">
+        <div class="avail-toolbar">
+          <div class="month-nav">
+            <button type="button" id="prevMonthBtn" class="btn btn-light btn-small">◀ السابق</button>
+            <h2 id="availMonthLabel">-</h2>
+            <button type="button" id="nextMonthBtn" class="btn btn-light btn-small">التالي ▶</button>
+          </div>
+          <button type="button" id="todayMonthBtn" class="btn btn-light">الشهر الحالي</button>
+        </div>
+
+        <div class="avail-summary" id="availSummary"></div>
+
+        <div class="avail-legend">
+          <span class="legend-item"><span class="legend-dot dot-available"></span>متاح للحجز</span>
+          <span class="legend-item"><span class="legend-dot dot-booked"></span>محجوز</span>
+          <span class="legend-item"><span class="legend-dot dot-past"></span>تاريخ منتهٍ</span>
+          <span class="legend-item"><span class="legend-dot dot-today"></span>اليوم</span>
+        </div>
+
+        <div class="calendar-wrap">
+          <div class="calendar-weekdays">
+            <span>الأحد</span><span>الاثنين</span><span>الثلاثاء</span><span>الأربعاء</span><span>الخميس</span><span>الجمعة</span><span>السبت</span>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+        </div>
+
+        <div class="avail-list-section">
+          <h3>الأيام المتاحة هذا الشهر <span id="availListCount" class="avail-count-badge"></span></h3>
+          <p class="field-hint">اضغط على أي يوم متاح لبدء حجز جديد بهذا التاريخ مباشرة.</p>
+          <div class="avail-list" id="availList"></div>
+          <p id="availListEmpty" class="empty-state" style="display:none;">لا توجد أيام متاحة هذا الشهر، جميع الأيام محجوزة بالكامل 🎉</p>
+        </div>
+      </section>
+
+      <!-- ===== Tab: Reports ===== -->
+      <section id="tab-reports" class="tab-panel">
+        <div class="panel-toolbar">
+          <h2>تقرير الحجوزات</h2>
+          <button id="printReportBtn" class="btn btn-primary">طباعة التقرير</button>
+        </div>
+        <div id="reportSummary" class="summary-cards"></div>
+        <div class="table-wrap">
+          <table id="reportTable">
+            <thead>
+              <tr>
+                <th>اسم العميل</th>
+                <th>الهاتف</th>
+                <th>تاريخ الحفلة</th>
+                <th>طريقة الدفع</th>
+                <th>الإجمالي</th>
+                <th>المدفوع</th>
+                <th>المتبقي</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="reportTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== Tab: Settings ===== -->
+      <section id="tab-settings" class="tab-panel">
+        <form id="settingsForm" class="form-card">
+          <h2>إعدادات القاعة</h2>
+          <div class="form-grid">
+            <div class="field">
+              <label>اسم القاعة</label>
+              <input type="text" id="settingsHallName">
+            </div>
+            <div class="field">
+              <label>رقم هاتف القاعة</label>
+              <input type="text" id="settingsHallPhone">
+            </div>
+            <div class="field full">
+              <label>عنوان القاعة</label>
+              <input type="text" id="settingsHallAddress">
+            </div>
+            <div class="field">
+              <label>رمز الدولة (لإرسال واتساب)</label>
+              <input type="text" id="settingsWhatsappCode" placeholder="مثال: 966">
+              <small class="field-hint">يُستخدم لتحويل أرقام العملاء المحلية إلى صيغة دولية عند الإرسال عبر واتساب</small>
+            </div>
+            <div class="field full">
+              <label>موقع القاعة (رابط خرائط جوجل أو العنوان)</label>
+              <input type="text" id="settingsHallLocation" placeholder="مثال: https://maps.app.goo.gl/xxxxx">
+              <small class="field-hint">يظهر كرمز QR على إيصال الحجز يمكن للعميل مسحه لفتح موقع القاعة مباشرة</small>
+            </div>
+            <div class="field full">
+              <label>شعار القاعة (يظهر في رأس إيصال الحجز)</label>
+              <div class="logo-upload-row">
+                <div id="logoPreviewWrap" class="logo-preview-wrap" style="display:none;">
+                  <img id="logoPreviewImg" class="logo-preview-img" alt="شعار القاعة">
+                </div>
+                <div class="logo-upload-actions">
+                  <button type="button" id="uploadLogoBtn" class="btn btn-light">📷 رفع شعار</button>
+                  <button type="button" id="removeLogoBtn" class="btn btn-danger btn-small" style="display:none;">إزالة الشعار</button>
+                  <input type="file" id="logoFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
+                </div>
+              </div>
+              <small class="field-hint">يُفضّل شعار بخلفية بيضاء أو شفافة. سيتم تصغير الصورة تلقائيًا لتناسب الإيصال.</small>
+            </div>
+          </div>
+
+          <div class="installments-header">
+            <h3>إعدادات الطباعة</h3>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label>الطابعة الافتراضية</label>
+              <select id="settingsPrinter">
+                <option value="">طابعة النظام الافتراضية</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <button type="button" id="refreshPrintersBtn" class="btn btn-light">تحديث قائمة الطابعات</button>
+            </div>
+          </div>
+
+          <div class="installments-header">
+            <h3>باكجات الطعام (تظهر عند الحجز إذا كان الطعام داخل القاعة)</h3>
+            <button type="button" id="addSettingsFoodPackageBtn" class="btn btn-light">+ إضافة باكج طعام</button>
+          </div>
+          <table id="settingsFoodPackagesTable">
+            <thead>
+              <tr><th>اسم الباكج</th><th>السعر (ر.س)</th><th>المكونات</th><th></th></tr>
+            </thead>
+            <tbody id="settingsFoodPackagesBody"></tbody>
+          </table>
+          <p id="settingsFoodPackagesEmpty" class="empty-state" style="display:none;">لا توجد باكجات طعام بعد. اضغط "إضافة باكج طعام" لإنشاء أول باكج.</p>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">حفظ الإعدادات</button>
+          </div>
+        </form>
+
+        <div class="form-card backup-card">
+          <h2>النسخ الاحتياطي</h2>
+          <p class="field-hint">احتفظ بنسخة من كل بياناتك (الحجوزات وإعدادات القاعة) بشكل دوري لحمايتها من الفقدان، ويمكنك استعادتها لاحقًا على نفس الجهاز أو جهاز آخر.</p>
+          <div class="backup-actions">
+            <button type="button" id="exportBackupBtn" class="btn btn-light">⬇️ تصدير نسخة احتياطية</button>
+            <button type="button" id="importBackupBtn" class="btn btn-light">⬆️ استيراد نسخة احتياطية</button>
+            <input type="file" id="importBackupFile" accept="application/json,.json" style="display:none;">
+          </div>
+          <p id="backupHint" class="field-hint backup-warning">⚠️ استيراد نسخة احتياطية سيستبدل جميع البيانات الحالية في التطبيق.</p>
+
+          <hr class="backup-divider">
+
+          <h3 class="auto-backup-title">🔄 النسخ الاحتياطي التلقائي</h3>
+          <p class="field-hint">يقوم البرنامج بحفظ نسخة احتياطية تلقائيًا على جهازك بعد كل تعديل وعند تشغيل البرنامج وإغلاقه، ويحتفظ بآخر 30 نسخة.</p>
+          <p class="field-hint" id="autoBackupStatus">جارِ التحقق من آخر نسخة تلقائية...</p>
+          <div class="backup-actions">
+            <button type="button" id="openAutoBackupFolderBtn" class="btn btn-light">📂 فتح مجلد النسخ التلقائية</button>
+          </div>
+        </div>
+
+        <div class="form-card remote-access-card">
+          <h2>📡 الوصول عن بُعد (عرض فقط)</h2>
+          <p class="field-hint">فعّل هذا الخيار للسماح لأجهزة أخرى على نفس الشبكة (أو عبر Radmin VPN بين الفروع) بعرض الحجوزات من جوال أو جهاز آخر، دون إمكانية التعديل.</p>
+          <div class="remote-toggle-row">
+            <label class="switch">
+              <input type="checkbox" id="remoteEnabledToggle">
+              <span class="slider"></span>
+            </label>
+            <span id="remoteStatusText">غير مفعّل</span>
+          </div>
+          <div id="remoteDetails" style="display:none;">
+            <div class="form-grid">
+              <div class="field full">
+                <label>روابط الوصول (افتحها من متصفح الجهاز الآخر أو أدخلها في تطبيق الأندرويد)</label>
+                <div id="remoteLinksList" class="remote-links-list"></div>
+              </div>
+              <div class="field">
+                <label>رمز الدخول (Token)</label>
+                <div class="remote-token-row">
+                  <input type="text" id="remoteTokenDisplay" readonly>
+                  <button type="button" id="regenerateTokenBtn" class="btn btn-light btn-small">🔄 تغيير الرمز</button>
+                </div>
+              </div>
+            </div>
+            <div id="remoteQrWrap" class="remote-qr-wrap"></div>
+            <p class="field-hint">💡 لو الفروع بأماكن مختلفة: ثبّت Radmin VPN على هذا الجهاز والأجهزة الأخرى، واستخدم عنوان IP الذي يعطيه Radmin بدل عنوان الشبكة المحلية.</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ===== Printable Receipt (hidden, shown only on print) ===== -->
+  <div id="printReceipt" class="print-only">
+    <div class="receipt">
+      <div class="receipt-top">
+        <div class="receipt-brand">
+          <img id="rHallLogo" class="receipt-logo" style="display:none;" alt="شعار القاعة">
+          <div class="receipt-brand-text">
+            <h1 id="rHallName">قاعة الأفراح</h1>
+            <p id="rHallInfo" class="receipt-brand-info"></p>
+          </div>
+        </div>
+        <div class="receipt-meta">
+          <div class="receipt-meta-row"><span>رقم الإيصال</span><strong id="rReceiptNo"></strong></div>
+          <div class="receipt-meta-row"><span>تاريخ الإصدار</span><strong id="rPrintDate"></strong></div>
+        </div>
+      </div>
+
+      <div class="receipt-title-bar">إيصال حجز قاعة</div>
+
+      <div class="receipt-section-title">بيانات العميل والحفلة</div>
+      <div class="receipt-info-grid">
+        <div class="receipt-info-item"><span class="li-label">اسم العميل</span><span class="li-value" id="rCustomerName"></span></div>
+        <div class="receipt-info-item"><span class="li-label">رقم الهاتف</span><span class="li-value" id="rPhone"></span></div>
+        <div class="receipt-info-item"><span class="li-label">تاريخ الحفلة</span><span class="li-value" id="rEventDate"></span></div>
+        <div class="receipt-info-item"><span class="li-label">كادر التصوير</span><span class="li-value" id="rPhotographer"></span></div>
+        <div class="receipt-info-item"><span class="li-label">الديجي</span><span class="li-value" id="rDj"></span></div>
+        <div class="receipt-info-item"><span class="li-label">اسم المنسقة</span><span class="li-value" id="rCoordinator"></span></div>
+        <div class="receipt-info-item" id="rAssistantsWrap" style="display:none;"><span class="li-label">عدد المساعدين/المنظمين</span><span class="li-value" id="rAssistants"></span></div>
+        <div class="receipt-info-item"><span class="li-label">تحضير الطعام</span><span class="li-value" id="rFoodLocation"></span></div>
+        <div class="receipt-info-item"><span class="li-label">طريقة الدفع</span><span class="li-value" id="rPaymentType"></span></div>
+      </div>
+
+      <div id="rFoodPackagesWrap" style="display:none;">
+        <div class="receipt-section-title">باكجات الطعام</div>
+        <table class="receipt-table" id="rFoodPackagesTable">
+          <thead><tr><th>الباكج</th><th>عدد القطع</th><th>السعر</th><th>الإجمالي</th><th>المكونات</th></tr></thead>
+          <tbody id="rFoodPackagesBody"></tbody>
+        </table>
+      </div>
+
+      <div class="receipt-section-title">التفاصيل المالية</div>
+      <table class="receipt-financial-table">
+        <tr><td>سعر الحجز</td><td id="rHallPrice"></td></tr>
+        <tr class="total-row"><td>المبلغ الإجمالي</td><td id="rTotal"></td></tr>
+        <tr><td>المبلغ المدفوع</td><td id="rPaid"></td></tr>
+        <tr class="remaining-row"><td>المبلغ المتبقي</td><td id="rRemaining"></td></tr>
+      </table>
+
+      <div id="rInstallmentsWrap" style="display:none;">
+        <div class="receipt-section-title">جدول الأقساط</div>
+        <table class="receipt-table" id="rInstallmentsTable">
+          <thead><tr><th>المبلغ</th><th>الاستحقاق</th><th>الحالة</th></tr></thead>
+          <tbody id="rInstallmentsBody"></tbody>
+        </table>
+      </div>
+
+      <div id="rNotesWrap" class="receipt-notes" style="display:none;">
+        <strong>ملاحظات</strong>
+        <span id="rNotes"></span>
+      </div>
+
+      <div id="rLocationWrap" class="receipt-location" style="display:none;">
+        <div class="receipt-location-inner">
+          <img id="rLocationQr" class="receipt-qr-img" alt="رمز QR لموقع القاعة">
+          <div class="receipt-location-text">
+            <strong>موقع القاعة</strong>
+            <p>امسح الرمز بكاميرا هاتفك لفتح موقع القاعة مباشرة</p>
+            <span id="rLocationLink" class="receipt-location-link"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="receipt-signatures">
+        <div class="sig-box"><span>توقيع العميل</span><div class="sig-line"></div></div>
+        <div class="sig-box"><span>توقيع إدارة القاعة</span><div class="sig-line"></div></div>
+      </div>
+
+      <p class="receipt-footer-pro">شكراً لاختياركم <span id="rHallNameFooter"></span> — هذا الإيصال دليل رسمي على الحجز</p>
+    </div>
+  </div>
+
+  <div id="printReportArea" class="print-only">
+    <div class="receipt">
+      <div class="receipt-top">
+        <div class="receipt-brand">
+          <h1 id="prHallName">قاعة الأفراح</h1>
+        </div>
+        <div class="receipt-meta">
+          <div class="receipt-meta-row"><span>تاريخ التقرير</span><strong id="prDate"></strong></div>
+        </div>
+      </div>
+      <div class="receipt-title-bar">تقرير الحجوزات</div>
+      <table class="receipt-table" id="prTable">
+        <thead>
+          <tr><th>العميل</th><th>الهاتف</th><th>التاريخ</th><th>الدفع</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr>
+        </thead>
+        <tbody id="prTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== Print Preview Modal ===== -->
+  <div id="printPreviewModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box print-preview-box">
+      <div class="modal-header">
+        <h3 id="previewTitle">معاينة قبل الطباعة</h3>
+        <button type="button" id="closePreviewBtn" class="btn btn-light btn-small">إغلاق ✕</button>
+      </div>
+      <div id="previewContent" class="preview-content"></div>
+      <div class="modal-footer">
+        <span id="previewPrinterHint" class="field-hint"></span>
+        <div class="modal-footer-actions">
+          <button type="button" id="previewWhatsappBtn" class="btn btn-whatsapp" style="display:none;">📱 إرسال عبر واتساب</button>
+          <button type="button" id="previewPdfBtn" class="btn btn-light">تحويل إلى PDF</button>
+          <button type="button" id="previewPrintBtn" class="btn btn-primary">طباعة</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/qrcode-vendor.js"></script>
+  <script src="remote-access.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

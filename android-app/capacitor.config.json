@@ -1,0 +1,8 @@
+{
+  "appId": "com.ibrahim.hallbookingsviewer",
+  "appName": "حجوزات القاعة",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  }
+}
