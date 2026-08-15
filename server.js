@@ -47,6 +47,13 @@ function startServer(store, port) {
   return new Promise((resolve, reject) => {
     const app = express();
 
+    // يسمح لتطبيق الأندرويد (يطلب البيانات مباشرة عبر API) بالوصول من أصل مختلف
+    app.use((req, res, next) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Headers', 'x-access-token, Content-Type');
+      next();
+    });
+
     app.get('/api/ping', (req, res) => res.json({ ok: true }));
 
     app.get('/api/info', (req, res) => {
@@ -179,7 +186,7 @@ function render(){
       + '</div>';
   }).join('');
 }
-function fmt(n){ return (Number(n)||0).toLocaleString('ar') + ' ر.س'; }
+function fmt(n){ return (Number(n)||0).toLocaleString('ar') + ' د.ع'; }
 function esc(s){ return String(s||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
 load();
 </script>

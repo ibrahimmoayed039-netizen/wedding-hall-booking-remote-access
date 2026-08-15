@@ -497,7 +497,7 @@ function updatePaymentFieldsVisibility() {
     $('installmentsSection').style.display = 'none';
   } else {
     $('paidAmountField').style.display = 'flex';
-    $('paidAmountLabel').textContent = type === 'عربون' ? 'مبلغ العربون (ر.س)' : 'المبلغ المدفوع حتى الآن (ر.س)';
+    $('paidAmountLabel').textContent = type === 'عربون' ? 'مبلغ العربون (د.ع)' : 'المبلغ المدفوع حتى الآن (د.ع)';
     $('installmentsSection').style.display = type === 'أقساط' ? 'block' : 'none';
   }
 }
@@ -928,6 +928,7 @@ $('settingsForm').addEventListener('submit', async (e) => {
     .filter(p => p.name);
 
   settings = {
+    ...settings, // الحفاظ على أي حقول أخرى غير موجودة بهذا النموذج (مثل remoteAccess)
     hallName: $('settingsHallName').value.trim() || 'قاعة الأفراح',
     hallPhone: $('settingsHallPhone').value.trim(),
     hallAddress: $('settingsHallAddress').value.trim(),
@@ -1293,7 +1294,7 @@ $('previewPdfBtn').addEventListener('click', async () => {
 // ---------------- Helpers ----------------
 function formatMoney(n) {
   const num = Number(n) || 0;
-  return num.toLocaleString('ar-EG') + ' ر.س';
+  return num.toLocaleString('ar-EG') + ' د.ع';
 }
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';

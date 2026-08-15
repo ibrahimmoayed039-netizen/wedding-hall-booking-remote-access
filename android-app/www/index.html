@@ -5,65 +5,95 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>حجوزات القاعة</title>
 <style>
+  :root{--bg:#0f172a;--card:#1e293b;--accent:#6366f1;--text:#f1f5f9;--muted:#94a3b8;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444;}
   *{box-sizing:border-box;}
-  html,body{margin:0;height:100%;font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#0f172a;}
-  #topbar{position:fixed;top:0;left:0;right:0;height:48px;background:#1e293b;display:flex;align-items:center;justify-content:space-between;padding:0 12px;z-index:10;padding-top:env(safe-area-inset-top);}
-  #topbar h1{color:#f1f5f9;font-size:14px;margin:0;}
-  #settingsBtn{background:none;border:none;color:#94a3b8;font-size:20px;padding:6px;}
-  #frameWrap{position:absolute;top:48px;left:0;right:0;bottom:0;}
-  iframe{width:100%;height:100%;border:none;background:#0f172a;}
-  #settingsScreen{position:fixed;inset:0;background:#0f172a;z-index:20;display:flex;flex-direction:column;justify-content:center;padding:24px;}
-  #settingsScreen h2{color:#f1f5f9;font-size:18px;margin-bottom:4px;}
-  #settingsScreen p{color:#94a3b8;font-size:13px;margin-bottom:20px;}
+  html,body{margin:0;height:100%;font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);}
+  #topbar{position:fixed;top:0;left:0;right:0;height:48px;background:var(--card);display:flex;align-items:center;justify-content:space-between;padding:0 12px;z-index:10;padding-top:env(safe-area-inset-top);}
+  #topbar h1{color:var(--text);font-size:14px;margin:0;}
+  #topbar .icons{display:flex;gap:6px;}
+  #topbar button{background:none;border:none;color:var(--muted);font-size:18px;padding:6px;}
+
+  #statusBanner{position:fixed;top:48px;left:0;right:0;z-index:9;padding:8px 14px;font-size:12px;text-align:center;display:none;}
+  #statusBanner.offline{display:block;background:#3a2410;color:var(--warn);}
+  #statusBanner.online{display:block;background:#0f2e1c;color:var(--ok);}
+
+  #contentWrap{position:absolute;top:48px;left:0;right:0;bottom:0;overflow-y:auto;padding:10px 12px 20px;}
+  #contentWrap.with-banner{top:80px;}
+
+  .search{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:var(--text);font-size:14px;margin-bottom:10px;}
+  .card{background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:10px;border-inline-start:4px solid var(--accent);}
+  .card .row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .card .name{font-weight:700;font-size:15px;color:var(--text);}
+  .card .date{color:var(--muted);font-size:12px;}
+  .card .meta{color:var(--muted);font-size:12.5px;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;}
+  .money{display:flex;justify-content:space-between;font-size:13px;background:#0b1220;border-radius:8px;padding:8px 10px;color:#cbd5e1;}
+  .money b{font-weight:700;}
+  .paid-full{color:var(--ok);}
+  .paid-partial{color:var(--warn);}
+  .paid-none{color:var(--danger);}
+  .status-line{font-size:11.5px;margin-top:6px;font-weight:600;}
+  .empty,.err{text-align:center;color:var(--muted);padding:40px 16px;font-size:13px;}
+  .updated{font-size:11px;color:var(--muted);text-align:center;padding:10px 0 2px;}
+  .refresh{position:fixed;bottom:16px;left:16px;background:var(--accent);color:#fff;border:none;border-radius:999px;width:48px;height:48px;font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:8;}
+  .refresh.spinning{animation:spin 0.8s linear infinite;}
+  @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+
+  #settingsScreen{position:fixed;inset:0;background:var(--bg);z-index:20;display:flex;flex-direction:column;justify-content:center;padding:24px;}
+  #settingsScreen h2{color:var(--text);font-size:18px;margin-bottom:4px;}
+  #settingsScreen p{color:var(--muted);font-size:13px;margin-bottom:20px;}
   #settingsScreen label{color:#cbd5e1;font-size:13px;display:block;margin-bottom:6px;}
-  #settingsScreen input{width:100%;padding:12px;border-radius:10px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:15px;margin-bottom:16px;direction:ltr;text-align:left;}
-  #settingsScreen button{width:100%;padding:13px;border:none;border-radius:10px;background:#6366f1;color:#fff;font-size:15px;font-weight:600;}
-  #settingsHint{background:#1e293b;border-radius:10px;padding:12px;font-size:12px;color:#94a3b8;margin-bottom:16px;line-height:1.7;}
-  #closeSettingsBtn{background:none !important;color:#94a3b8 !important;margin-top:10px;font-size:13px;}
+  #settingsScreen input{width:100%;padding:12px;border-radius:10px;border:1px solid #334155;background:var(--card);color:var(--text);font-size:15px;margin-bottom:16px;direction:ltr;text-align:left;}
+  #settingsScreen button.primary{width:100%;padding:13px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;}
+  #settingsHint{background:var(--card);border-radius:10px;padding:12px;font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7;}
+  #closeSettingsBtn{background:none !important;color:var(--muted) !important;margin-top:10px;font-size:13px;border:none;width:100%;padding:8px;}
 </style>
 </head>
 <body>
   <div id="topbar">
     <h1 id="titleText">حجوزات القاعة</h1>
-    <button id="settingsBtn" onclick="openSettings()">⚙️</button>
+    <div class="icons">
+      <button id="settingsBtn" onclick="openSettings()">⚙️</button>
+    </div>
   </div>
-  <div id="frameWrap">
-    <iframe id="viewFrame" src="about:blank"></iframe>
+  <div id="statusBanner"></div>
+
+  <div id="contentWrap">
+    <input class="search" id="searchBox" placeholder="بحث بالاسم أو رقم الهاتف أو التاريخ..." oninput="renderList()">
+    <div id="list"></div>
+    <div class="updated" id="updatedAt"></div>
   </div>
+  <button class="refresh" id="refreshBtn" onclick="loadData()" title="تحديث">⟳</button>
 
   <div id="settingsScreen" style="display:none;">
     <h2>إعداد الاتصال بالخادم</h2>
     <p>أدخل عنوان الجهاز الرئيسي (القاعة) ورمز الدخول الظاهر في إعدادات البرنامج → الوصول عن بُعد</p>
     <div id="settingsHint">
-      📶 نفس الشبكة: استخدم عنوان IP المحلي (مثال: 192.168.1.10)<br>
-      🌍 فرع بمكان آخر: ثبّت Radmin VPN على الجهازين واستخدم عنوان IP الذي يعطيه Radmin
+      📶 نفس الشبكة: استخدم عنوان IP المحلي (مثال: 192.168.1.10:4500)<br>
+      🌍 فرع بمكان آخر: ثبّت Radmin VPN على الجهازين واستخدم عنوان IP الذي يعطيه Radmin<br>
+      💾 التطبيق يحفظ آخر بيانات وصلت تلقائياً، ويعرضها حتى لو كان جهاز اللابتوب مغلقاً وقت الفتح.
     </div>
     <label>عنوان الخادم (IP:المنفذ)</label>
     <input id="serverAddrInput" placeholder="مثال: 192.168.1.10:4500">
     <label>رمز الدخول (Token)</label>
     <input id="tokenInputField" placeholder="مثال: a1b2c3d4">
-    <button onclick="saveSettings()">اتصال وحفظ</button>
+    <button class="primary" onclick="saveConnectionSettings()">اتصال وحفظ</button>
     <button id="closeSettingsBtn" onclick="closeSettings()">إلغاء</button>
   </div>
 
 <script>
-function buildUrl(addr, token){
-  addr = addr.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
-  return 'http://' + addr + '/?token=' + encodeURIComponent(token.trim());
+let bookings = [];
+let lastSyncedAt = null;
+let isLoading = false;
+
+function apiBase(){
+  const addr = (localStorage.getItem('serverAddr') || '').trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  return addr ? ('http://' + addr) : '';
 }
-function loadSaved(){
-  const addr = localStorage.getItem('serverAddr');
-  const token = localStorage.getItem('serverToken');
-  if (addr && token) {
-    document.getElementById('viewFrame').src = buildUrl(addr, token);
-    document.getElementById('settingsScreen').style.display = 'none';
-  } else {
-    openSettings();
-  }
-}
+function getToken(){ return localStorage.getItem('serverToken') || ''; }
+
 function openSettings(){
   document.getElementById('serverAddrInput').value = localStorage.getItem('serverAddr') || '';
-  document.getElementById('tokenInputField').value = localStorage.getItem('serverToken') || '';
+  document.getElementById('tokenInputField').value = getToken();
   document.getElementById('settingsScreen').style.display = 'flex';
 }
 function closeSettings(){
@@ -71,16 +101,153 @@ function closeSettings(){
     document.getElementById('settingsScreen').style.display = 'none';
   }
 }
-function saveSettings(){
+function saveConnectionSettings(){
   const addr = document.getElementById('serverAddrInput').value.trim();
   const token = document.getElementById('tokenInputField').value.trim();
   if (!addr || !token) { alert('الرجاء تعبئة العنوان ورمز الدخول'); return; }
   localStorage.setItem('serverAddr', addr);
   localStorage.setItem('serverToken', token);
-  document.getElementById('viewFrame').src = buildUrl(addr, token);
   document.getElementById('settingsScreen').style.display = 'none';
+  loadData();
 }
-loadSaved();
+
+// ---------- التخزين المحلي (آخر نسخة معروفة من البيانات) ----------
+function saveCache(hallName, list){
+  try {
+    localStorage.setItem('cache_hallName', hallName || 'حجوزات القاعة');
+    localStorage.setItem('cache_bookings', JSON.stringify(list));
+    localStorage.setItem('cache_syncedAt', new Date().toISOString());
+  } catch (e) { /* تجاهل أخطاء التخزين */ }
+}
+function loadCache(){
+  try {
+    const raw = localStorage.getItem('cache_bookings');
+    const hallName = localStorage.getItem('cache_hallName');
+    const syncedAt = localStorage.getItem('cache_syncedAt');
+    if (raw) {
+      bookings = JSON.parse(raw);
+      lastSyncedAt = syncedAt;
+      if (hallName) document.getElementById('titleText').textContent = hallName;
+      return true;
+    }
+  } catch (e) { /* تجاهل */ }
+  return false;
+}
+
+function setBanner(mode, text){
+  const el = document.getElementById('statusBanner');
+  const wrap = document.getElementById('contentWrap');
+  if (mode === 'none') {
+    el.style.display = 'none';
+    el.className = '';
+    wrap.classList.remove('with-banner');
+    return;
+  }
+  el.className = mode;
+  el.textContent = text;
+  wrap.classList.add('with-banner');
+}
+
+async function loadData(){
+  if (isLoading) return;
+  const addr = localStorage.getItem('serverAddr');
+  const token = getToken();
+  if (!addr || !token) { openSettings(); return; }
+
+  isLoading = true;
+  document.getElementById('refreshBtn').classList.add('spinning');
+
+  const base = apiBase();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+
+  try {
+    const infoRes = await fetch(base + '/api/info?token=' + encodeURIComponent(token), { signal: controller.signal });
+    if (infoRes.status === 401) {
+      alert('رمز الدخول غير صحيح. حدّث الإعدادات.');
+      openSettings();
+      return;
+    }
+    if (!infoRes.ok) throw new Error('server error');
+    const info = await infoRes.json();
+
+    const bookingsRes = await fetch(base + '/api/bookings?token=' + encodeURIComponent(token), { signal: controller.signal });
+    const data = await bookingsRes.json();
+
+    bookings = data;
+    lastSyncedAt = new Date().toISOString();
+    document.getElementById('titleText').textContent = info.hallName || 'حجوزات القاعة';
+    saveCache(info.hallName, data);
+    setBanner('none');
+  } catch (err) {
+    // فشل الاتصال: نعرض آخر نسخة محفوظة محلياً مع تنبيه
+    const hadCache = loadCache();
+    if (hadCache) {
+      setBanner('offline', '⚠️ تعذر الاتصال بالخادم — تُعرض آخر بيانات محفوظة');
+    } else {
+      setBanner('offline', '⚠️ تعذر الاتصال بالخادم ولا توجد بيانات محفوظة مسبقاً');
+    }
+  } finally {
+    clearTimeout(timeout);
+    isLoading = false;
+    document.getElementById('refreshBtn').classList.remove('spinning');
+    renderList();
+  }
+}
+
+function statusInfo(remaining, paid){
+  if (remaining <= 0) return { cls: 'paid-full', label: 'مدفوع بالكامل' };
+  if (paid > 0) return { cls: 'paid-partial', label: 'دفعة جزئية' };
+  return { cls: 'paid-none', label: 'غير مدفوع' };
+}
+
+function renderList(){
+  const q = (document.getElementById('searchBox').value || '').trim();
+  const list = document.getElementById('list');
+  let items = bookings.slice().sort((a,b)=> (a.eventDate||'').localeCompare(b.eventDate||''));
+  if (q) items = items.filter(b => ((b.customerName||'')+(b.phone||'')+(b.eventDate||'')).includes(q));
+
+  if (items.length === 0) {
+    list.innerHTML = '<div class="empty">لا توجد بيانات لعرضها</div>';
+  } else {
+    list.innerHTML = items.map(b => {
+      const total = Number(b.totalAmount)||0;
+      const paid = Number(b.paidAmount)||0;
+      const remaining = b.remaining != null ? b.remaining : Math.max(0, total - paid);
+      const s = statusInfo(remaining, paid);
+      let meta = b.phone ? ('<span>📞 ' + esc(b.phone) + '</span>') : '';
+      if (b.coordinatorName) meta += '<span>🎤 ' + esc(b.coordinatorName) + '</span>';
+      if (b.djName) meta += '<span>🎧 ' + esc(b.djName) + '</span>';
+      if (b.photographerName) meta += '<span>📷 ' + esc(b.photographerName) + '</span>';
+      return '<div class="card">'
+        + '<div class="row1"><span class="name">' + esc(b.customerName) + '</span><span class="date">' + esc(b.eventDate) + '</span></div>'
+        + '<div class="meta">' + meta + '</div>'
+        + '<div class="money"><span>الإجمالي: <b>' + fmt(total) + '</b></span><span>المتبقي: <b class="' + s.cls + '">' + fmt(remaining) + '</b></span></div>'
+        + '<div class="status-line ' + s.cls + '">' + s.label + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  const updatedEl = document.getElementById('updatedAt');
+  updatedEl.textContent = lastSyncedAt ? ('آخر تحديث: ' + new Date(lastSyncedAt).toLocaleString('ar')) : '';
+}
+
+function fmt(n){ return (Number(n)||0).toLocaleString('ar') + ' د.ع'; }
+function esc(s){ return String(s||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+// ---------- بدء التشغيل ----------
+(function init(){
+  const addr = localStorage.getItem('serverAddr');
+  const token = getToken();
+  if (!addr || !token) {
+    openSettings();
+    return;
+  }
+  // اعرض آخر نسخة محفوظة فوراً (بدون انتظار الشبكة)، ثم حاول التحديث
+  loadCache();
+  renderList();
+  loadData();
+})();
 </script>
 </body>
 </html>

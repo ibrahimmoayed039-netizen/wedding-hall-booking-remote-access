@@ -1,5 +1,15 @@
 * { box-sizing: border-box; }
 
+/* منع تحديد النص بكل البرنامج (ما عدا حقول الإدخال) */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+input, textarea, select, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 body {
   margin: 0;
   font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
