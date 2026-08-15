@@ -11,7 +11,7 @@
   "dependencies": {
     "electron-store": "^8.2.0",
     "express": "^4.19.2",
-    "cloudflared": "^0.6.0"
+    "cloudflared": "^0.7.1"
   },
   "devDependencies": {
     "electron": "^30.0.0",

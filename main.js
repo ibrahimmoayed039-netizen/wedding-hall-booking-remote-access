@@ -33,6 +33,30 @@ let cloudflareTunnelHandle = null;
 let publicTunnelUrl = null;
 let publicTunnelStatus = 'stopped'; // stopped | connecting | ready | error
 let publicTunnelError = null;
+let tunnelStarting = false; // يمنع تشغيل أكثر من نفق بنفس الوقت (سبب رئيسي لمشكلة الانهيار)
+
+// ---------- شبكة أمان: يمنع انهيار البرنامج بالكامل بسبب خلل داخلي بمكتبة cloudflared ----------
+// مكتبة cloudflared (المسؤولة عن "الرابط العام") فيها خلل معروف: أحيانًا تطلق حدث "error"
+// بدون أي مستمع مسجّل له، و Node.js بشكل افتراضي "يرمي" ذلك الخطأ كاستثناء غير ملتقط،
+// وإذا حاولت المكتبة إعادة المحاولة بشكل متزامن عند كل رمي، تتكوّن حلقة استدعاء متداخلة
+// تنهار الذاكرة (Maximum call stack size exceeded) وتظهر نافذة الخطأ وتوقف البرنامج.
+// هذا المعالج يمنع الانهيار الكامل، ويعيد حالة الرابط العام إلى "خطأ" بدل تعطيل البرنامج كله.
+process.on('uncaughtException', (err) => {
+  const msg = String((err && err.stack) || (err && err.message) || err);
+  console.error('[uncaughtException]', msg);
+  if (/tunnel/i.test(msg) || /cloudflared/i.test(msg) || /call stack/i.test(msg)) {
+    tunnelStarting = false;
+    cloudflareTunnelHandle = null;
+    publicTunnelUrl = null;
+    publicTunnelStatus = 'error';
+    publicTunnelError = 'تعذر تشغيل الرابط العام (خلل داخلي بأداة الربط). الرابط المحلي عبر الشبكة/Radmin غير متأثر ويستمر بالعمل.';
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('remote:error', publicTunnelError);
+    }
+    return; // لا نوقف التطبيق - نكمل العمل بشكل طبيعي بدون الرابط العام فقط
+  }
+  // أي خطأ غير متوقع آخر: نسجله فقط ولا نوقف البرنامج قسريًا حتى لا تضيع بيانات المستخدم
+});
 
 // ---------- Remote (read-only) Access Server ----------
 async function stopRemoteServer() {
@@ -48,25 +72,46 @@ async function stopCloudflareTunnel() {
     try { cloudflareTunnelHandle.stop(); } catch (e) { /* تجاهل */ }
     cloudflareTunnelHandle = null;
   }
+  tunnelStarting = false;
   publicTunnelUrl = null;
   publicTunnelStatus = 'stopped';
   publicTunnelError = null;
 }
 
 async function startCloudflareTunnel(port) {
+  // يمنع تشغيل أكثر من نفق بنفس الوقت (يحصل مثلاً لو المستخدم بدّل الإعدادات بسرعة) -
+  // تشغيل نفقين معًا كان سببًا رئيسيًا لخلل "Maximum call stack size exceeded"
+  if (tunnelStarting) return;
+  tunnelStarting = true;
   const { bin, install, tunnel } = require('cloudflared');
   publicTunnelStatus = 'connecting';
   publicTunnelError = null;
   try {
     await install(bin); // يحمّل ملف cloudflared مرة واحدة فقط إذا ما كان موجود (يحتاج إنترنت أول مرة)
   } catch (err) {
+    tunnelStarting = false;
     publicTunnelStatus = 'error';
     publicTunnelError = 'تعذر تحميل أداة الربط (يحتاج اتصال إنترنت أول مرة): ' + String((err && err.message) || err);
     return;
   }
   try {
-    const { url, stop } = tunnel({ '--url': `http://localhost:${port}` });
+    const { url, stop, child } = tunnel({ '--url': `http://localhost:${port}` });
     cloudflareTunnelHandle = { stop };
+    // نلتقط أخطاء عملية cloudflared الفرعية بأنفسنا حتى لا تتحول لاستثناء غير ملتقط بالمكتبة
+    if (child && typeof child.on === 'function') {
+      child.on('error', (err) => {
+        publicTunnelStatus = 'error';
+        publicTunnelError = String((err && err.message) || err);
+      });
+      child.on('exit', (code) => {
+        if (publicTunnelStatus === 'ready' && code !== 0) {
+          publicTunnelStatus = 'error';
+          publicTunnelError = 'توقفت أداة الربط بشكل غير متوقع (رمز الخروج: ' + code + ').';
+          cloudflareTunnelHandle = null;
+          publicTunnelUrl = null;
+        }
+      });
+    }
     publicTunnelUrl = await url;
     publicTunnelStatus = 'ready';
     if (mainWindow) mainWindow.webContents.send('remote:publicReady', publicTunnelUrl);
@@ -74,6 +119,8 @@ async function startCloudflareTunnel(port) {
   } catch (err) {
     publicTunnelStatus = 'error';
     publicTunnelError = String((err && err.message) || err);
+  } finally {
+    tunnelStarting = false;
   }
 }
 
