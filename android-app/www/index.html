@@ -44,6 +44,7 @@
   #settingsScreen label{color:#cbd5e1;font-size:13px;display:block;margin-bottom:6px;}
   #settingsScreen input{width:100%;padding:12px;border-radius:10px;border:1px solid #334155;background:var(--card);color:var(--text);font-size:15px;margin-bottom:16px;direction:ltr;text-align:left;}
   #settingsScreen button.primary{width:100%;padding:13px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;}
+  #settingsScreen button.scanBtn{width:100%;padding:12px;border:1px dashed #475569;border-radius:10px;background:#1e293b;color:#cbd5e1;font-size:14px;font-weight:600;margin-bottom:14px;}
   #settingsHint{background:var(--card);border-radius:10px;padding:12px;font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7;}
   #closeSettingsBtn{background:none !important;color:var(--muted) !important;margin-top:10px;font-size:13px;border:none;width:100%;padding:8px;}
 </style>
@@ -69,27 +70,87 @@
     <p>أدخل عنوان الجهاز الرئيسي (القاعة) ورمز الدخول الظاهر في إعدادات البرنامج → الوصول عن بُعد</p>
     <div id="settingsHint">
       📶 نفس الشبكة: استخدم عنوان IP المحلي (مثال: 192.168.1.10:4500)<br>
-      🌍 فرع بمكان آخر: ثبّت Radmin VPN على الجهازين واستخدم عنوان IP الذي يعطيه Radmin<br>
+      🌍 من أي مكان بالنت: استخدم الرابط العام الظاهر بإعدادات البرنامج (يبدأ بـ https://)<br>
+      🔒 فرع بمكان آخر بدون إنترنت: ثبّت Radmin VPN على الجهازين واستخدم عنوان IP الذي يعطيه Radmin<br>
       💾 التطبيق يحفظ آخر بيانات وصلت تلقائياً، ويعرضها حتى لو كان جهاز اللابتوب مغلقاً وقت الفتح.
     </div>
-    <label>عنوان الخادم (IP:المنفذ)</label>
-    <input id="serverAddrInput" placeholder="مثال: 192.168.1.10:4500">
+    <label>عنوان الخادم (IP:المنفذ أو الرابط العام)</label>
+    <input id="serverAddrInput" placeholder="مثال: 192.168.1.10:4500 أو https://xxxx.trycloudflare.com">
     <label>رمز الدخول (Token)</label>
     <input id="tokenInputField" placeholder="مثال: a1b2c3d4">
+    <button class="scanBtn" onclick="scanQRCode()">📷 مسح رمز QR بدل الكتابة</button>
     <button class="primary" onclick="saveConnectionSettings()">اتصال وحفظ</button>
     <button id="closeSettingsBtn" onclick="closeSettings()">إلغاء</button>
   </div>
 
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 let bookings = [];
 let lastSyncedAt = null;
 let isLoading = false;
 
 function apiBase(){
-  const addr = (localStorage.getItem('serverAddr') || '').trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
-  return addr ? ('http://' + addr) : '';
+  let addr = (localStorage.getItem('serverAddr') || '').trim();
+  if (!addr) return '';
+  addr = addr.replace(/\/$/, '');
+  if (!/^https?:\/\//i.test(addr)) addr = 'http://' + addr;
+  return addr;
 }
 function getToken(){ return localStorage.getItem('serverToken') || ''; }
+
+// ---------- مسح رمز QR (يعبّي العنوان والرمز تلقائياً ويتصل) ----------
+async function scanQRCode(){
+  try {
+    const CameraPlugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera;
+    if (!CameraPlugin) { alert('تعذر الوصول للكاميرا داخل التطبيق.'); return; }
+    if (typeof jsQR !== 'function') {
+      alert('أداة مسح الرمز تحتاج اتصال إنترنت لتحميلها أول مرة. تأكد من الاتصال وحاول مرة ثانية.');
+      return;
+    }
+    const photo = await CameraPlugin.getPhoto({
+      resultType: 'dataUrl',
+      source: 'CAMERA',
+      quality: 70,
+      saveToGallery: false
+    });
+    const decoded = await decodeQRFromDataUrl(photo.dataUrl);
+    if (!decoded) { alert('ما قدرنا نقرأ رمز QR بالصورة. جرّب مرة ثانية بإضاءة أفضل.'); return; }
+    const parsed = parseScanResult(decoded);
+    if (!parsed) { alert('الرمز الممسوح مو رابط اتصال صحيح.'); return; }
+    document.getElementById('serverAddrInput').value = parsed.addr;
+    document.getElementById('tokenInputField').value = parsed.token;
+    saveConnectionSettings();
+  } catch (err) {
+    // المستخدم ألغى المسح أو رفض صلاحية الكاميرا - نتجاهل بصمت
+  }
+}
+
+function decodeQRFromDataUrl(dataUrl){
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const result = jsQR(imageData.data, canvas.width, canvas.height);
+      resolve(result ? result.data : null);
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+function parseScanResult(text){
+  try {
+    const u = new URL(text);
+    const token = u.searchParams.get('token') || '';
+    if (!token) return null;
+    return { addr: u.protocol + '//' + u.host, token };
+  } catch (e) { return null; }
+}
 
 function openSettings(){
   document.getElementById('serverAddrInput').value = localStorage.getItem('serverAddr') || '';

@@ -347,6 +347,7 @@ tbody tr:hover { background: #faf8fd; }
 .remote-token-row input { flex: 1; direction: ltr; text-align: center; font-weight: 700; letter-spacing: 1px; }
 .remote-qr-wrap { text-align: center; margin-top: 16px; }
 .remote-qr-img { border-radius: 10px; border: 8px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+.public-access-title { font-size: 15px; margin: 4px 0 6px; }
 .auto-backup-title { font-size: 15px; margin: 0 0 6px; }
 #autoBackupStatus { margin-top: 6px; }
 .backup-warning { margin-top: 12px; color: #b8860b; }

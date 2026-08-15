@@ -17,5 +17,8 @@ contextBridge.exposeInMainWorld('api', {
   openAutoBackupFolder: () => ipcRenderer.invoke('backup:openAutoFolder'),
   getRemoteInfo: () => ipcRenderer.invoke('remote:getInfo'),
   setRemoteEnabled: (enabled) => ipcRenderer.invoke('remote:setEnabled', enabled),
-  regenerateRemoteToken: () => ipcRenderer.invoke('remote:regenerateToken')
+  setPublicEnabled: (enabled) => ipcRenderer.invoke('remote:setPublicEnabled', enabled),
+  regenerateRemoteToken: () => ipcRenderer.invoke('remote:regenerateToken'),
+  regenerateNtfyTopic: () => ipcRenderer.invoke('remote:regenerateNtfyTopic'),
+  onRemotePublicReady: (callback) => ipcRenderer.on('remote:publicReady', (event, url) => callback(url))
 });

@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "electron-store": "^8.2.0",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "cloudflared": "^0.6.0"
   },
   "devDependencies": {
     "electron": "^30.0.0",
@@ -30,7 +31,8 @@
       "index.html",
       "renderer.js",
       "style.css",
-      "assets/**/*"
+      "assets/**/*",
+      "node_modules/**/*"
     ],
     "win": {
       "target": [

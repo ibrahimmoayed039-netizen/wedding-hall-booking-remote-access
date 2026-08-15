@@ -1,5 +1,7 @@
 // إدارة قسم "الوصول عن بُعد" في تبويب الإعدادات
 (function () {
+  let publicPollTimer = null;
+
   function renderRemoteUI(info) {
     const toggle = document.getElementById('remoteEnabledToggle');
     const statusText = document.getElementById('remoteStatusText');
@@ -47,6 +49,79 @@
         qrWrap.appendChild(label);
       } catch (e) { /* ignore QR errors */ }
     }
+
+    renderPublicUI(info);
+    renderNtfyUI(info);
+  }
+
+  function renderNtfyUI(info) {
+    const linkEl = document.getElementById('ntfySubscribeLink');
+    const qrWrap = document.getElementById('ntfyQrWrap');
+    if (!linkEl) return;
+    const topic = info.ntfyTopic || '';
+    if (!topic) { linkEl.textContent = '—'; qrWrap.innerHTML = ''; return; }
+    const subscribeUrl = `https://ntfy.sh/${topic}`;
+    linkEl.textContent = subscribeUrl;
+    qrWrap.innerHTML = '';
+    try {
+      const dataUrl = makeQRCodeDataURL(subscribeUrl, 160);
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.alt = 'QR للاشتراك بالتنبيهات';
+      img.className = 'remote-qr-img';
+      qrWrap.appendChild(img);
+    } catch (e) { /* ignore */ }
+  }
+
+  function renderPublicUI(info) {
+    const publicToggle = document.getElementById('publicEnabledToggle');
+    const publicStatusText = document.getElementById('publicStatusText');
+    const publicDetails = document.getElementById('publicDetails');
+    const publicUrlText = document.getElementById('publicUrlText');
+    const publicQrWrap = document.getElementById('publicQrWrap');
+    const publicErrorText = document.getElementById('publicErrorText');
+    if (!publicToggle) return;
+
+    publicToggle.disabled = !info.enabled;
+    publicToggle.checked = !!info.publicEnabled;
+    publicDetails.style.display = info.publicEnabled ? 'block' : 'none';
+    publicErrorText.textContent = '';
+
+    if (!info.enabled) {
+      publicStatusText.textContent = 'فعّل "الوصول عن بُعد" أولاً بالأعلى';
+    } else if (!info.publicEnabled) {
+      publicStatusText.textContent = 'غير مفعّل';
+    } else if (info.publicStatus === 'ready' && info.publicUrl) {
+      publicStatusText.textContent = 'مفعّل - جاهز';
+      publicUrlText.textContent = info.publicUrl;
+      publicQrWrap.innerHTML = '';
+      try {
+        const dataUrl = makeQRCodeDataURL(info.publicUrl, 180);
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.alt = 'QR للرابط العام';
+        img.className = 'remote-qr-img';
+        publicQrWrap.appendChild(img);
+      } catch (e) { /* ignore */ }
+      stopPublicPolling();
+    } else if (info.publicStatus === 'error') {
+      publicStatusText.textContent = 'حصل خطأ';
+      publicUrlText.textContent = '—';
+      publicErrorText.textContent = info.publicError || 'تعذر إنشاء الرابط العام.';
+      stopPublicPolling();
+    } else {
+      publicStatusText.textContent = 'جارِ إنشاء الرابط... (قد يأخذ عدة ثوانٍ)';
+      publicUrlText.textContent = 'جارِ الإنشاء...';
+      startPublicPolling();
+    }
+  }
+
+  function startPublicPolling() {
+    if (publicPollTimer) return;
+    publicPollTimer = setInterval(refreshRemoteInfo, 2000);
+  }
+  function stopPublicPolling() {
+    if (publicPollTimer) { clearInterval(publicPollTimer); publicPollTimer = null; }
   }
 
   async function refreshRemoteInfo() {
@@ -58,6 +133,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     const toggle = document.getElementById('remoteEnabledToggle');
     const regenBtn = document.getElementById('regenerateTokenBtn');
+    const publicToggle = document.getElementById('publicEnabledToggle');
+    const copyPublicBtn = document.getElementById('copyPublicLinkBtn');
     if (!toggle) return;
 
     toggle.addEventListener('change', async () => {
@@ -69,6 +146,37 @@
       await window.api.regenerateRemoteToken();
       refreshRemoteInfo();
     });
+
+    publicToggle.addEventListener('change', async () => {
+      const info = await window.api.setPublicEnabled(publicToggle.checked);
+      renderRemoteUI(info);
+    });
+
+    copyPublicBtn.addEventListener('click', () => {
+      const url = document.getElementById('publicUrlText').textContent;
+      if (!url || url.includes('جارِ')) return;
+      navigator.clipboard.writeText(url);
+      copyPublicBtn.textContent = 'تم النسخ ✓';
+      setTimeout(() => { copyPublicBtn.textContent = 'نسخ'; }, 1500);
+    });
+
+    const copyNtfyBtn = document.getElementById('copyNtfyLinkBtn');
+    const regenNtfyBtn = document.getElementById('regenerateNtfyBtn');
+    copyNtfyBtn.addEventListener('click', () => {
+      const url = document.getElementById('ntfySubscribeLink').textContent;
+      if (!url || url === '—') return;
+      navigator.clipboard.writeText(url);
+      copyNtfyBtn.textContent = 'تم النسخ ✓';
+      setTimeout(() => { copyNtfyBtn.textContent = 'نسخ'; }, 1500);
+    });
+    regenNtfyBtn.addEventListener('click', async () => {
+      await window.api.regenerateNtfyTopic();
+      refreshRemoteInfo();
+    });
+
+    if (window.api.onRemotePublicReady) {
+      window.api.onRemotePublicReady(() => refreshRemoteInfo());
+    }
 
     refreshRemoteInfo();
   });

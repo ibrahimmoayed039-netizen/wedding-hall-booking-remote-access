@@ -351,6 +351,36 @@
             </div>
             <div id="remoteQrWrap" class="remote-qr-wrap"></div>
             <p class="field-hint">💡 لو الفروع بأماكن مختلفة: ثبّت Radmin VPN على هذا الجهاز والأجهزة الأخرى، واستخدم عنوان IP الذي يعطيه Radmin بدل عنوان الشبكة المحلية.</p>
+
+            <hr class="backup-divider">
+            <h3 class="public-access-title">🌍 الوصول من أي مكان (عبر الإنترنت)</h3>
+            <p class="field-hint">يعطيك رابط عام يشتغل من خارج الشبكة تماماً (مو بس نفس الواي فاي)، بدون فتح أي منفذ بالراوتر. يحتاج اتصال إنترنت بجهاز اللابتوب.</p>
+            <div class="remote-toggle-row">
+              <label class="switch">
+                <input type="checkbox" id="publicEnabledToggle">
+                <span class="slider"></span>
+              </label>
+              <span id="publicStatusText">غير مفعّل</span>
+            </div>
+            <div id="publicDetails" style="display:none;">
+              <div class="remote-link-item">
+                <code id="publicUrlText">جارِ الإنشاء...</code>
+                <button type="button" class="btn btn-light btn-small" id="copyPublicLinkBtn">نسخ</button>
+              </div>
+              <div id="publicQrWrap" class="remote-qr-wrap"></div>
+              <p class="field-hint" id="publicErrorText" style="color:#dc2626;"></p>
+              <p class="field-hint">⚠️ الرابط يتغيّر كل مرة تشغّل فيها هذا الخيار من جديد (رابط مؤقت مجاني). لرابط ثابت دائم، يحتاج إعداد إضافي لاحقاً.</p>
+
+              <hr class="backup-divider">
+              <h3 class="public-access-title">🔔 استلام الرابط الجديد تلقائياً على جوالك</h3>
+              <p class="field-hint">حمّل تطبيق <b>ntfy</b> المجاني من Google Play، وافتح رابط الاشتراك بالأسفل (أو امسح الـ QR) من جوالك — وبعدها أي رابط جديد يوصلك تنبيه فوري تلقائياً.</p>
+              <div class="remote-link-item">
+                <code id="ntfySubscribeLink">—</code>
+                <button type="button" class="btn btn-light btn-small" id="copyNtfyLinkBtn">نسخ</button>
+              </div>
+              <div id="ntfyQrWrap" class="remote-qr-wrap"></div>
+              <button type="button" id="regenerateNtfyBtn" class="btn btn-light btn-small" style="margin-top:8px;">🔄 توليد قناة تنبيهات جديدة</button>
+            </div>
           </div>
         </div>
       </section>
