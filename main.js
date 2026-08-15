@@ -95,7 +95,11 @@ async function startCloudflareTunnel(port) {
     return;
   }
   try {
-    const { url, stop, child } = tunnel({ '--url': `http://localhost:${port}` });
+    // نجبر استخدام بروتوكول http2 بدل QUIC الافتراضي:
+    // QUIC يعتمد على UDP على المنفذ 7844، وكثير من الشبكات/مزودي الإنترنت يحجبون UDP
+    // بهذا المنفذ تحديدًا حتى مع وجود إنترنت طبيعي لتصفح المواقع (التصفح يستخدم TCP).
+    // http2 يعتمد على TCP العادي، وهو الأكثر توافقًا مع الشبكات المقيّدة.
+    const { url, stop, child } = tunnel({ '--url': `http://localhost:${port}`, '--protocol': 'http2' });
     cloudflareTunnelHandle = { stop };
     // نلتقط أخطاء عملية cloudflared الفرعية بأنفسنا حتى لا تتحول لاستثناء غير ملتقط بالمكتبة
     if (child && typeof child.on === 'function') {
