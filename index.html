@@ -19,6 +19,7 @@
         <button class="tab-btn" data-tab="availability">التوفر الشهري</button>
         <button class="tab-btn" data-tab="expenses">المصاريف</button>
         <button class="tab-btn" data-tab="reports">التقارير</button>
+        <button class="tab-btn" data-tab="pending">طلبات الجوال <span id="pendingBadge" class="badge" style="display:none;">0</span></button>
         <button class="tab-btn" data-tab="settings">الإعدادات</button>
       </nav>
     </header>
@@ -321,6 +322,16 @@
         </div>
       </section>
 
+      <!-- ===== Tab: Pending mobile booking requests ===== -->
+      <section id="tab-pending" class="tab-panel">
+        <div class="form-card">
+          <h2>📥 طلبات حجز من تطبيق الجوال</h2>
+          <p class="field-hint">حجوزات أولية سجّلها الموظفون من تطبيق الأندرويد (حتى بدون إنترنت وقت التسجيل، وتُرسل تلقائياً بعد ذلك). راجع كل طلب وأكمل بياناته ثم احفظه كحجز، أو ارفضه.</p>
+          <div id="pendingEmptyMsg" class="field-hint" style="display:none;">لا توجد طلبات حالياً.</div>
+          <div id="pendingList"></div>
+        </div>
+      </section>
+
       <!-- ===== Tab: Settings ===== -->
       <section id="tab-settings" class="tab-panel">
         <form id="settingsForm" class="form-card">
@@ -443,6 +454,17 @@
             </div>
             <div id="remoteQrWrap" class="remote-qr-wrap"></div>
             <p class="field-hint">💡 لو الفروع بأماكن مختلفة: ثبّت Radmin VPN على هذا الجهاز والأجهزة الأخرى، واستخدم عنوان IP الذي يعطيه Radmin بدل عنوان الشبكة المحلية.</p>
+
+            <hr class="backup-divider">
+            <h3 class="public-access-title">📝 استقبال حجوزات أولية من تطبيق الجوال</h3>
+            <p class="field-hint">لو فعّلت هذا الخيار، يقدر الموظف يسجّل حجز أولي من تطبيق الأندرويد حتى بدون إنترنت (يُحفظ عنده ويُرسل تلقائياً أول ما يتوفر اتصال). الطلب ما يدخل كحجز نهائي مباشرة، بل يظهر لك بتبويب "طلبات الجوال" لمراجعته وإكمال بياناته ثم قبوله أو رفضه.</p>
+            <div class="remote-toggle-row">
+              <label class="switch">
+                <input type="checkbox" id="allowBookingRequestsToggle">
+                <span class="slider"></span>
+              </label>
+              <span id="allowBookingRequestsStatusText">غير مفعّل</span>
+            </div>
 
             <hr class="backup-divider">
             <h3 class="public-access-title">🌍 الوصول من أي مكان (عبر الإنترنت)</h3>

@@ -11,6 +11,7 @@ const store = new Store({
   defaults: {
     bookings: [],
     expenses: [],
+    pendingBookings: [],
     settings: {
       hallName: 'قاعة الأفراح',
       hallPhone: '',
@@ -23,6 +24,7 @@ const store = new Store({
         port: 4500,
         token: crypto.randomBytes(4).toString('hex'),
         publicEnabled: false,
+        allowBookingRequests: false,
         ntfyTopic: 'hall-' + crypto.randomBytes(6).toString('hex')
       }
     }
@@ -190,6 +192,27 @@ async function notifyNewPublicUrl(url) {
   }
 }
 
+// ---------- إشعار عند وصول طلب حجز أولي جديد من تطبيق الجوال ----------
+async function notifyNewPendingBooking(pending) {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('pending:new', pending);
+    }
+  } catch (e) { /* تجاهل */ }
+  try {
+    const settings = store.get('settings');
+    const topic = settings && settings.remoteAccess && settings.remoteAccess.ntfyTopic;
+    if (!topic) return;
+    await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
+      method: 'POST',
+      headers: { 'Title': encodeURIComponent('طلب حجز جديد من الجوال') },
+      body: `العميل: ${pending.customerName || '—'}\nالتاريخ: ${pending.eventDate || '—'}\nراجع تبويب "طلبات الجوال" لقبول الطلب أو رفضه.`
+    });
+  } catch (err) {
+    // فشل الإشعار مو حرج، نتجاهله بصمت
+  }
+}
+
 async function applyRemoteServerState() {
   await stopRemoteServer();
   await stopCloudflareTunnel();
@@ -197,7 +220,7 @@ async function applyRemoteServerState() {
   const remote = settings && settings.remoteAccess;
   if (!remote || !remote.enabled) return;
   try {
-    remoteServerInstance = await startServer(store, remote.port || 4500);
+    remoteServerInstance = await startServer(store, remote.port || 4500, notifyNewPendingBooking);
   } catch (err) {
     remoteServerInstance = null;
     if (mainWindow) {
@@ -347,6 +370,18 @@ ipcMain.handle('bookings:replaceAll', (event, bookings) => {
   return store.get('bookings');
 });
 
+// ---------- IPC: طلبات الحجز الأولية الواردة من تطبيق الجوال (وضع عدم الاتصال بالكتابة) ----------
+
+ipcMain.handle('pending:getAll', () => {
+  return store.get('pendingBookings') || [];
+});
+
+ipcMain.handle('pending:delete', (event, id) => {
+  const list = (store.get('pendingBookings') || []).filter(p => p.id !== id);
+  store.set('pendingBookings', list);
+  return list;
+});
+
 // ---------- IPC: Expenses CRUD (صندوق المصاريف) ----------
 
 ipcMain.handle('expenses:getAll', () => {
@@ -406,7 +441,9 @@ function buildRemoteInfoResponse() {
     publicStatus: publicTunnelStatus,
     publicError: publicTunnelError,
     publicDiagLog: publicTunnelDiagLog.join('\n'),
-    ntfyTopic: remote.ntfyTopic || ''
+    ntfyTopic: remote.ntfyTopic || '',
+    allowBookingRequests: !!remote.allowBookingRequests,
+    pendingCount: (store.get('pendingBookings') || []).length
   };
 }
 
@@ -427,6 +464,14 @@ ipcMain.handle('remote:setPublicEnabled', async (event, enabled) => {
   settings.remoteAccess.publicEnabled = !!enabled;
   store.set('settings', settings);
   await applyRemoteServerState();
+  return buildRemoteInfoResponse();
+});
+
+ipcMain.handle('remote:setAllowBookingRequests', async (event, enabled) => {
+  const settings = store.get('settings');
+  settings.remoteAccess = settings.remoteAccess || { enabled: false, port: 4500, publicEnabled: false };
+  settings.remoteAccess.allowBookingRequests = !!enabled;
+  store.set('settings', settings);
   return buildRemoteInfoResponse();
 });
 

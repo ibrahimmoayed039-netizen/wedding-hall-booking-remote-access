@@ -52,6 +52,18 @@
 
     renderPublicUI(info);
     renderNtfyUI(info);
+    renderAllowBookingRequestsUI(info);
+  }
+
+  function renderAllowBookingRequestsUI(info) {
+    const toggle = document.getElementById('allowBookingRequestsToggle');
+    const statusText = document.getElementById('allowBookingRequestsStatusText');
+    if (!toggle) return;
+    toggle.disabled = !info.enabled;
+    toggle.checked = !!info.allowBookingRequests;
+    statusText.textContent = !info.enabled
+      ? 'فعّل "الوصول عن بُعد" أولاً بالأعلى'
+      : (info.allowBookingRequests ? 'مفعّل' : 'غير مفعّل');
   }
 
   function renderNtfyUI(info) {
@@ -155,6 +167,14 @@
       const info = await window.api.setPublicEnabled(publicToggle.checked);
       renderRemoteUI(info);
     });
+
+    const allowBookingRequestsToggle = document.getElementById('allowBookingRequestsToggle');
+    if (allowBookingRequestsToggle) {
+      allowBookingRequestsToggle.addEventListener('change', async () => {
+        const info = await window.api.setAllowBookingRequests(allowBookingRequestsToggle.checked);
+        renderRemoteUI(info);
+      });
+    }
 
     copyPublicBtn.addEventListener('click', () => {
       const url = document.getElementById('publicUrlText').textContent;

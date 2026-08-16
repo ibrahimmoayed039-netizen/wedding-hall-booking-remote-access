@@ -1,5 +1,6 @@
 let bookings = [];
 let expenses = [];
+let pendingBookings = [];
 let settings = { hallName: 'قاعة الأفراح', hallPhone: '', hallAddress: '', foodPackages: [], printerName: '' };
 let currentInstallments = [];
 let currentFoodPackages = [];
@@ -62,6 +63,7 @@ function switchTab(tab) {
   if (tab === 'reports') renderReport();
   if (tab === 'availability') renderAvailabilityCalendar();
   if (tab === 'expenses') renderExpensesTable();
+  if (tab === 'pending') renderPendingList();
 }
 
 // ---------------- Init ----------------
@@ -78,8 +80,91 @@ async function init() {
   renderBookingsTable();
   renderFoodPackagesChecklist();
   loadPrinters();
+  if (window.api.getPendingBookings) {
+    pendingBookings = await window.api.getPendingBookings();
+    updatePendingBadge();
+  }
+  if (window.api.onPendingNew) {
+    window.api.onPendingNew(async () => {
+      pendingBookings = await window.api.getPendingBookings();
+      updatePendingBadge();
+      if (document.getElementById('tab-pending').classList.contains('active')) renderPendingList();
+    });
+  }
 }
 init();
+
+// ---------------- طلبات الحجز الأولية من تطبيق الجوال ----------------
+function updatePendingBadge() {
+  const badge = $('pendingBadge');
+  if (!badge) return;
+  const n = pendingBookings.length;
+  badge.textContent = String(n);
+  badge.style.display = n > 0 ? 'inline-block' : 'none';
+}
+
+function renderPendingList() {
+  const wrap = $('pendingList');
+  const emptyMsg = $('pendingEmptyMsg');
+  if (!wrap) return;
+  if (pendingBookings.length === 0) {
+    wrap.innerHTML = '';
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  const sorted = pendingBookings.slice().sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+  wrap.innerHTML = sorted.map(p => {
+    const dateTaken = bookings.some(b => b.eventDate === p.eventDate);
+    const conflictNote = dateTaken ? '<div class="p-notes" style="color:#dc2626;">⚠️ هذا التاريخ محجوز مسبقًا - راجع قبل القبول</div>' : '';
+    return `<div class="pending-card">
+      <div class="p-row1"><span class="p-name">${escapeHtml(p.customerName)}</span><span class="p-date">${escapeHtml(p.eventDate || '')}</span></div>
+      <div class="p-meta">
+        ${p.phone ? '<span>📞 ' + escapeHtml(p.phone) + '</span>' : ''}
+        ${p.depositAmount ? '<span>💰 دفعة أولية: ' + formatMoney(p.depositAmount) + '</span>' : ''}
+        ${p.submittedBy ? '<span>👤 ' + escapeHtml(p.submittedBy) + '</span>' : ''}
+      </div>
+      ${p.notes ? '<div class="p-notes">' + escapeHtml(p.notes) + '</div>' : ''}
+      ${conflictNote}
+      <div class="p-submitted">أُرسل: ${p.submittedAt ? new Date(p.submittedAt).toLocaleString('ar') : '-'}</div>
+      <div class="p-actions">
+        <button type="button" class="btn btn-primary btn-small" data-action="acceptPending" data-id="${p.id}">قبول وإكمال الحجز</button>
+        <button type="button" class="btn btn-danger btn-small" data-action="rejectPending" data-id="${p.id}">رفض</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+$('pendingList') && $('pendingList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const pending = pendingBookings.find(p => p.id === id);
+  if (!pending) return;
+
+  if (btn.dataset.action === 'rejectPending') {
+    if (!confirm('رفض هذا الطلب نهائيًا؟')) return;
+    pendingBookings = await window.api.deletePendingBooking(id);
+    updatePendingBadge();
+    renderPendingList();
+    return;
+  }
+
+  if (btn.dataset.action === 'acceptPending') {
+    resetForm();
+    $('customerName').value = pending.customerName || '';
+    $('phone').value = pending.phone || '';
+    $('eventDate').value = pending.eventDate || '';
+    $('paidAmount').value = pending.depositAmount || 0;
+    $('notes').value = pending.notes || '';
+    updatePaymentFieldsVisibility();
+    updateComputedTotal();
+    pendingBookings = await window.api.deletePendingBooking(id);
+    updatePendingBadge();
+    switchTab('newBooking');
+    alert('راجع بيانات الحجز وأكملها (السعر وباقي التفاصيل) ثم اضغط "حفظ الحجز".');
+  }
+});
 
 function applySettingsToUI() {
   $('hallTitle').textContent = settings.hallName || 'نظام حجوزات القاعة';

@@ -42,15 +42,23 @@ function checkToken(req, expectedToken) {
   return provided && String(provided) === String(expectedToken);
 }
 
-// خادم HTTP للقراءة فقط: يوفر بيانات الحجوزات لعملاء الشبكة (أجهزة أخرى + تطبيق أندرويد)
-function startServer(store, port) {
+function genPendingId() {
+  return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// خادم HTTP: يوفر بيانات الحجوزات لعملاء الشبكة (أجهزة أخرى + تطبيق أندرويد) للقراءة،
+// ويستقبل اختياريًا "طلبات حجز أولية" من تطبيق الأندرويد (وضع عدم الاتصال بالكتابة) لو فُعّل ذلك بالإعدادات.
+function startServer(store, port, onNewPendingBooking) {
   return new Promise((resolve, reject) => {
     const app = express();
+    app.use(express.json({ limit: '1mb' }));
 
     // يسمح لتطبيق الأندرويد (يطلب البيانات مباشرة عبر API) بالوصول من أصل مختلف
     app.use((req, res, next) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Headers', 'x-access-token, Content-Type');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      if (req.method === 'OPTIONS') return res.sendStatus(204);
       next();
     });
 
@@ -72,6 +80,48 @@ function startServer(store, port) {
       if (!checkToken(req, remote.token)) return res.status(401).json({ error: 'unauthorized' });
       const bookings = store.get('bookings') || [];
       res.json(bookings.map(publicBooking));
+    });
+
+    // استقبال طلب حجز أولي من تطبيق الأندرويد (يُحفظ كـ"طلب معلّق" بانتظار مراجعة الموظف بالجهاز الرئيسي)
+    app.post('/api/pending-bookings', (req, res) => {
+      const settings = store.get('settings') || {};
+      const remote = settings.remoteAccess || {};
+      if (!checkToken(req, remote.token)) return res.status(401).json({ error: 'unauthorized' });
+      if (!remote.allowBookingRequests) return res.status(403).json({ error: 'disabled' });
+
+      const body = req.body || {};
+      const customerName = String(body.customerName || '').trim();
+      const eventDate = String(body.eventDate || '').trim();
+      if (!customerName || !eventDate) {
+        return res.status(400).json({ error: 'missing_fields', message: 'الاسم وتاريخ المناسبة مطلوبان' });
+      }
+
+      const pending = {
+        id: genPendingId(),
+        clientId: String(body.clientId || '').trim() || null,
+        customerName,
+        phone: String(body.phone || '').trim(),
+        eventDate,
+        depositAmount: Number(body.depositAmount) || 0,
+        notes: String(body.notes || '').trim(),
+        submittedBy: String(body.submittedBy || '').trim(),
+        submittedAt: new Date().toISOString()
+      };
+
+      const list = store.get('pendingBookings') || [];
+      // لو نفس الطلب (نفس clientId) وصل من قبل (إعادة محاولة مزامنة بعد نجاحها فعليًا)، لا نكرره
+      if (pending.clientId && list.some(p => p.clientId === pending.clientId)) {
+        const existing = list.find(p => p.clientId === pending.clientId);
+        return res.json({ ok: true, id: existing.id, duplicate: true });
+      }
+      list.push(pending);
+      store.set('pendingBookings', list);
+
+      if (typeof onNewPendingBooking === 'function') {
+        try { onNewPendingBooking(pending); } catch (e) { /* تجاهل */ }
+      }
+
+      res.json({ ok: true, id: pending.id });
     });
 
     app.get('/', (req, res) => {

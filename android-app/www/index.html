@@ -46,6 +46,30 @@
   .refresh.spinning{animation:spin 0.8s linear infinite;}
   @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 
+  /* ---------- New booking request (offline write) ---------- */
+  .queue-badge{display:inline-block;background:var(--warn);color:#1a1200;font-size:10.5px;font-weight:800;border-radius:999px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 4px;margin-inline-start:3px;}
+  .req-form{background:var(--card);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .req-form label{display:block;color:#cbd5e1;font-size:12.5px;margin-bottom:5px;margin-top:12px;}
+  .req-form label:first-child{margin-top:0;}
+  .req-form input,.req-form textarea{width:100%;padding:11px;border-radius:9px;border:1px solid #334155;background:#0b1220;color:var(--text);font-size:14px;font-family:inherit;}
+  .req-form textarea{resize:vertical;min-height:60px;}
+  .req-form .req-hint{font-size:11px;color:var(--muted);margin-top:4px;}
+  .req-submit-btn{width:100%;padding:13px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:15px;font-weight:700;margin-top:16px;}
+  .req-submit-btn:disabled{opacity:.6;}
+  .queue-section-title{color:var(--text);font-size:13.5px;font-weight:700;margin:6px 0 10px;}
+  .queue-item{background:var(--card);border-radius:10px;padding:10px 12px;margin-bottom:8px;border-inline-start:4px solid var(--muted);}
+  .queue-item.status-pending{border-inline-start-color:var(--warn);}
+  .queue-item.status-sent{border-inline-start-color:var(--ok);}
+  .queue-item.status-failed{border-inline-start-color:var(--danger);}
+  .queue-item .q-row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+  .queue-item .q-name{font-weight:700;font-size:13.5px;color:var(--text);}
+  .queue-item .q-date{color:var(--muted);font-size:11.5px;}
+  .queue-item .q-status{font-size:11px;font-weight:700;}
+  .queue-item.status-pending .q-status{color:var(--warn);}
+  .queue-item.status-sent .q-status{color:var(--ok);}
+  .queue-item.status-failed .q-status{color:var(--danger);}
+  .queue-item .q-del{background:none;border:none;color:var(--danger);font-size:11px;padding:4px 0;}
+
   /* ---------- Calendar view ---------- */
   .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
   .cal-nav button{background:#1e293b;border:1px solid #334155;color:var(--text);border-radius:8px;padding:8px 14px;font-size:15px;}
@@ -112,6 +136,7 @@
     <div class="tabs">
       <button class="tab-btn active" id="tabListBtn" onclick="switchView('list')">📋 القائمة</button>
       <button class="tab-btn" id="tabCalBtn" onclick="switchView('calendar')">📅 الأيام المتاحة والمحجوزة</button>
+      <button class="tab-btn" id="tabNewBtn" onclick="switchView('newRequest')">➕ حجز جديد <span id="queueBadge" class="queue-badge" style="display:none;">0</span></button>
     </div>
 
     <div class="view active" id="viewList">
@@ -137,6 +162,24 @@
         <span><i class="a"></i> متاح</span>
         <span><i class="p"></i> منتهٍ</span>
       </div>
+    </div>
+
+    <div class="view" id="viewNewRequest">
+      <div class="req-form">
+        <label>اسم العميل *</label>
+        <input id="reqCustomerName" placeholder="مثال: أحمد محمد">
+        <label>رقم الهاتف</label>
+        <input id="reqPhone" type="tel" placeholder="مثال: 0501234567" dir="ltr" style="text-align:right;">
+        <label>تاريخ المناسبة *</label>
+        <input id="reqEventDate" type="date">
+        <label>دفعة أولية / عربون (اختياري)</label>
+        <input id="reqDeposit" type="number" min="0" placeholder="0">
+        <label>ملاحظات</label>
+        <textarea id="reqNotes" placeholder="أي تفاصيل إضافية..."></textarea>
+        <p class="req-hint">📶 لو ما فيه اتصال بالخادم الآن، الطلب يُحفظ بالجوال ويُرسل تلقائياً أول ما يتوفر الاتصال. الطلب ما يصير حجز نهائي إلا بعد مراجعته وقبوله من الجهاز الرئيسي.</p>
+        <button type="button" class="req-submit-btn" id="reqSubmitBtn" onclick="submitBookingRequest()">حفظ وإرسال طلب الحجز</button>
+      </div>
+      <div id="queueWrap"></div>
     </div>
 
     <div class="updated" id="updatedAt"></div>
@@ -210,26 +253,40 @@ function getToken(){ return localStorage.getItem('serverToken') || ''; }
 async function scanQRCode(){
   try {
     const CameraPlugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera;
-    if (!CameraPlugin) { alert('تعذر الوصول للكاميرا داخل التطبيق.'); return; }
+    if (!CameraPlugin) { alert('تعذر الوصول للكاميرا داخل التطبيق. جرّب تعبئة العنوان والرمز يدوياً بالأسفل.'); return; }
     if (typeof jsQR !== 'function') {
-      alert('أداة مسح الرمز تحتاج اتصال إنترنت لتحميلها أول مرة. تأكد من الاتصال وحاول مرة ثانية.');
+      alert('أداة قراءة رمز QR تحتاج تحميل من الإنترنت أول مرة فقط، وما قدرت تتحمّل الآن (تأكد إن الجوال متصل بالإنترنت عادي - وايفاي غير شبكة القاعة أو بيانات الجوال - وحاول مرة ثانية). ممكن أيضاً تعبّي العنوان والرمز يدوياً بالأسفل بدون الحاجة للكاميرا إطلاقاً.');
       return;
     }
-    const photo = await CameraPlugin.getPhoto({
-      resultType: 'dataUrl',
-      source: 'CAMERA',
-      quality: 70,
-      saveToGallery: false
-    });
+    let photo;
+    try {
+      photo = await CameraPlugin.getPhoto({
+        resultType: 'dataUrl',
+        source: 'CAMERA',
+        quality: 85,
+        saveToGallery: false,
+        width: 1000
+      });
+    } catch (camErr) {
+      const msg = String((camErr && camErr.message) || camErr || '');
+      if (/permission/i.test(msg)) {
+        alert('صلاحية الكاميرا غير مفعّلة لهذا التطبيق. افتح إعدادات الجوال → التطبيقات → حجوزات القاعة → الأذونات → فعّل الكاميرا، ثم حاول مرة ثانية. أو عبّي العنوان والرمز يدوياً بالأسفل.');
+      }
+      // المستخدم ألغى المسح: لا شيء يُعرض
+      return;
+    }
     const decoded = await decodeQRFromDataUrl(photo.dataUrl);
-    if (!decoded) { alert('ما قدرنا نقرأ رمز QR بالصورة. جرّب مرة ثانية بإضاءة أفضل.'); return; }
+    if (!decoded) {
+      alert('ما قدرنا نقرأ رمز QR بالصورة. جرّب: تأكد إن الرمز كامل وواضح داخل الإطار، إضاءة أفضل، وبدون انعكاس ضوء عليه. أو أسهل: عبّي العنوان والرمز يدوياً بالأسفل (مرة واحدة بس).');
+      return;
+    }
     const parsed = parseScanResult(decoded);
-    if (!parsed) { alert('الرمز الممسوح مو رابط اتصال صحيح.'); return; }
+    if (!parsed) { alert('الرمز الممسوح مو رابط اتصال صحيح (تأكد إنه رمز QR الظاهر بإعدادات البرنامج → الوصول عن بُعد).'); return; }
     document.getElementById('serverAddrInput').value = parsed.addr;
     document.getElementById('tokenInputField').value = parsed.token;
     saveConnectionSettings();
   } catch (err) {
-    // المستخدم ألغى المسح أو رفض صلاحية الكاميرا - نتجاهل بصمت
+    // خطأ غير متوقع - نتجاهل بصمت (المستخدم يقدر يعبّي يدوياً)
   }
 }
 
@@ -303,6 +360,155 @@ function loadCache(){
   return false;
 }
 
+// ---------- وضع عدم الاتصال بالكتابة: طلبات حجز أولية تُحفظ محلياً وتُرسل تلقائياً ----------
+function genClientId(){
+  return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+function loadQueue(){
+  try {
+    const raw = localStorage.getItem('bookingRequestQueue');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function saveQueue(queue){
+  try { localStorage.setItem('bookingRequestQueue', JSON.stringify(queue)); } catch (e) { /* تجاهل */ }
+}
+function updateQueueBadge(){
+  const queue = loadQueue();
+  const unsent = queue.filter(q => q.status !== 'sent').length;
+  const badge = document.getElementById('queueBadge');
+  if (!badge) return;
+  badge.textContent = String(unsent);
+  badge.style.display = unsent > 0 ? 'inline-block' : 'none';
+}
+
+async function submitBookingRequest(){
+  const customerName = document.getElementById('reqCustomerName').value.trim();
+  const eventDate = document.getElementById('reqEventDate').value;
+  const phone = document.getElementById('reqPhone').value.trim();
+  const deposit = Number(document.getElementById('reqDeposit').value) || 0;
+  const notes = document.getElementById('reqNotes').value.trim();
+
+  if (!customerName || !eventDate) {
+    alert('الرجاء تعبئة اسم العميل وتاريخ المناسبة على الأقل.');
+    return;
+  }
+  if (!apiBase() || !getToken()) {
+    alert('الرجاء إعداد الاتصال بالخادم أولاً من ⚙️ الإعدادات (مرة واحدة كافية، ثم يشتغل الحفظ حتى بدون نت).');
+    openSettings();
+    return;
+  }
+
+  const item = {
+    clientId: genClientId(),
+    customerName, phone, eventDate,
+    depositAmount: deposit,
+    notes,
+    createdAt: new Date().toISOString(),
+    status: 'pending',
+    lastError: ''
+  };
+  const queue = loadQueue();
+  queue.push(item);
+  saveQueue(queue);
+
+  document.getElementById('reqCustomerName').value = '';
+  document.getElementById('reqPhone').value = '';
+  document.getElementById('reqEventDate').value = '';
+  document.getElementById('reqDeposit').value = '';
+  document.getElementById('reqNotes').value = '';
+
+  updateQueueBadge();
+  renderQueue();
+  trySyncQueue();
+}
+
+let isSyncingQueue = false;
+async function trySyncQueue(){
+  if (isSyncingQueue) return;
+  const base = apiBase();
+  const token = getToken();
+  if (!base || !token) return;
+  let queue = loadQueue();
+  const toSend = queue.filter(q => q.status !== 'sent');
+  if (toSend.length === 0) return;
+
+  isSyncingQueue = true;
+  for (const item of toSend) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(base + '/api/pending-bookings?token=' + encodeURIComponent(token), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-access-token': token },
+        body: JSON.stringify({
+          clientId: item.clientId,
+          customerName: item.customerName,
+          phone: item.phone,
+          eventDate: item.eventDate,
+          depositAmount: item.depositAmount,
+          notes: item.notes,
+          submittedBy: localStorage.getItem('deviceLabel') || ''
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        item.status = 'sent';
+        item.lastError = '';
+      } else if (res.status === 401) {
+        item.status = 'failed';
+        item.lastError = 'رمز الدخول غير صحيح';
+      } else if (res.status === 403) {
+        item.status = 'failed';
+        item.lastError = 'استقبال الحجوزات من الجوال غير مفعّل بإعدادات البرنامج الرئيسي';
+      } else {
+        const data = await res.json().catch(() => ({}));
+        item.status = 'failed';
+        item.lastError = data.message || 'تعذر الإرسال';
+      }
+    } catch (err) {
+      clearTimeout(timeout);
+      item.status = 'pending'; // فشل شبكة مؤقت - يبقى بالقائمة ويُعاد المحاولة تلقائياً
+      item.lastError = 'بانتظار الاتصال بالإنترنت';
+    }
+  }
+  // نحتفظ بسجل الطلبات المُرسلة بنجاح لآخر يوم فقط لتخفيف القائمة، ونحذف الأقدم من ذلك
+  queue = queue.filter(q => q.status !== 'sent' || (Date.now() - new Date(q.createdAt).getTime()) < 24 * 60 * 60 * 1000);
+  saveQueue(queue);
+  isSyncingQueue = false;
+  updateQueueBadge();
+  if (currentView === 'newRequest') renderQueue();
+}
+
+function renderQueue(){
+  const wrap = document.getElementById('queueWrap');
+  if (!wrap) return;
+  const queue = loadQueue().slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  if (queue.length === 0) { wrap.innerHTML = ''; return; }
+  const statusLabel = { pending: '⏳ بانتظار الإرسال', sent: '✅ تم الإرسال', failed: '❌ فشل الإرسال' };
+  wrap.innerHTML = '<div class="queue-section-title">طلبات هذا الجهاز</div>' + queue.map(q => {
+    const label = statusLabel[q.status] || q.status;
+    const errLine = q.status === 'failed' && q.lastError ? ('<div style="font-size:10.5px;color:var(--danger);margin-top:2px;">' + esc(q.lastError) + '</div>') : '';
+    const delBtn = q.status !== 'pending' ? ('<button type="button" class="q-del" onclick="removeQueueItem(\'' + q.clientId + '\')">حذف</button>') : '';
+    return '<div class="queue-item status-' + q.status + '">'
+      + '<div class="q-row1"><span class="q-name">' + esc(q.customerName) + '</span><span class="q-date">' + esc(q.eventDate) + '</span></div>'
+      + '<div class="q-status">' + label + '</div>'
+      + errLine + delBtn
+      + '</div>';
+  }).join('');
+}
+
+function removeQueueItem(clientId){
+  const queue = loadQueue().filter(q => q.clientId !== clientId);
+  saveQueue(queue);
+  renderQueue();
+  updateQueueBadge();
+}
+
+window.addEventListener('online', trySyncQueue);
+setInterval(trySyncQueue, 25000);
+
 function setBanner(mode, text){
   const el = document.getElementById('statusBanner');
   const wrap = document.getElementById('contentWrap');
@@ -348,6 +554,7 @@ async function loadData(){
     document.getElementById('titleText').textContent = info.hallName || 'حجوزات القاعة';
     saveCache(info.hallName, data);
     setBanner('none');
+    trySyncQueue();
   } catch (err) {
     // فشل الاتصال: نعرض آخر نسخة محفوظة محلياً مع تنبيه
     const hadCache = loadCache();
@@ -370,17 +577,21 @@ function statusInfo(remaining, paid){
   return { cls: 'paid-none', label: 'غير مدفوع' };
 }
 
-// ---------- تبديل العرض: قائمة / تقويم ----------
+// ---------- تبديل العرض: قائمة / تقويم / حجز جديد ----------
 function switchView(view){
   currentView = view;
   document.getElementById('tabListBtn').classList.toggle('active', view === 'list');
   document.getElementById('tabCalBtn').classList.toggle('active', view === 'calendar');
+  document.getElementById('tabNewBtn').classList.toggle('active', view === 'newRequest');
   document.getElementById('viewList').classList.toggle('active', view === 'list');
   document.getElementById('viewCalendar').classList.toggle('active', view === 'calendar');
+  document.getElementById('viewNewRequest').classList.toggle('active', view === 'newRequest');
   renderCurrentView();
 }
 function renderCurrentView(){
-  if (currentView === 'calendar') renderCalendar(); else renderList();
+  if (currentView === 'calendar') renderCalendar();
+  else if (currentView === 'newRequest') renderQueue();
+  else renderList();
 }
 
 function renderList(){
@@ -544,6 +755,7 @@ function esc(s){ return String(s||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&
 
 // ---------- بدء التشغيل ----------
 (function init(){
+  updateQueueBadge();
   const addr = localStorage.getItem('serverAddr');
   const token = getToken();
   if (!addr || !token) {

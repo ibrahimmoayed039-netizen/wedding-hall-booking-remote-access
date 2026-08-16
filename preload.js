@@ -25,5 +25,9 @@ contextBridge.exposeInMainWorld('api', {
   regenerateRemoteToken: () => ipcRenderer.invoke('remote:regenerateToken'),
   regenerateNtfyTopic: () => ipcRenderer.invoke('remote:regenerateNtfyTopic'),
   testRemoteConnectivity: () => ipcRenderer.invoke('remote:testConnectivity'),
-  onRemotePublicReady: (callback) => ipcRenderer.on('remote:publicReady', (event, url) => callback(url))
+  onRemotePublicReady: (callback) => ipcRenderer.on('remote:publicReady', (event, url) => callback(url)),
+  setAllowBookingRequests: (enabled) => ipcRenderer.invoke('remote:setAllowBookingRequests', enabled),
+  getPendingBookings: () => ipcRenderer.invoke('pending:getAll'),
+  deletePendingBooking: (id) => ipcRenderer.invoke('pending:delete', id),
+  onPendingNew: (callback) => ipcRenderer.on('pending:new', (event, pending) => callback(pending))
 });
