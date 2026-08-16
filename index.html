@@ -17,6 +17,7 @@
         <button class="tab-btn active" data-tab="bookings">الحجوزات</button>
         <button class="tab-btn" data-tab="newBooking">حجز جديد</button>
         <button class="tab-btn" data-tab="availability">التوفر الشهري</button>
+        <button class="tab-btn" data-tab="expenses">المصاريف</button>
         <button class="tab-btn" data-tab="reports">التقارير</button>
         <button class="tab-btn" data-tab="settings">الإعدادات</button>
       </nav>
@@ -204,10 +205,86 @@
       </section>
 
       <!-- ===== Tab: Reports ===== -->
+      <!-- ===== Tab: Expenses (صندوق المصاريف) ===== -->
+      <section id="tab-expenses" class="tab-panel">
+        <form id="expenseForm" class="form-card">
+          <input type="hidden" id="expenseId">
+          <h2 id="expenseFormTitle">إضافة مصروف</h2>
+          <div class="form-grid">
+            <div class="field">
+              <label>الوصف / البند *</label>
+              <input type="text" id="expenseDescription" placeholder="مثال: فاتورة كهرباء، صيانة، رواتب..." required>
+            </div>
+            <div class="field">
+              <label>التصنيف</label>
+              <select id="expenseCategory">
+                <option value="تشغيلية">تشغيلية (كهرباء، ماء، صيانة)</option>
+                <option value="رواتب">رواتب وأجور</option>
+                <option value="مستلزمات">مستلزمات وتجهيزات</option>
+                <option value="تسويق">تسويق وإعلان</option>
+                <option value="أخرى">أخرى</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>المبلغ *</label>
+              <input type="number" id="expenseAmount" min="0" step="1" required>
+            </div>
+            <div class="field">
+              <label>التاريخ *</label>
+              <input type="date" id="expenseDate" required>
+            </div>
+            <div class="field full">
+              <label>ملاحظات</label>
+              <textarea id="expenseNotes" rows="2"></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">حفظ المصروف</button>
+            <button type="button" id="resetExpenseFormBtn" class="btn btn-light">مصروف جديد</button>
+          </div>
+        </form>
+
+        <div class="panel-toolbar">
+          <h2>سجل المصاريف</h2>
+          <input type="month" id="expenseMonthFilter" title="تصفية حسب الشهر">
+          <button id="clearExpenseFilter" class="btn btn-light">إلغاء الفلترة</button>
+        </div>
+        <div id="expenseSummary" class="summary-cards"></div>
+        <div class="table-wrap">
+          <table id="expensesTable">
+            <thead>
+              <tr>
+                <th>الوصف</th>
+                <th>التصنيف</th>
+                <th>التاريخ</th>
+                <th>المبلغ</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="expensesTableBody"></tbody>
+          </table>
+        </div>
+        <div id="expensesEmptyState" style="display:none; text-align:center; padding: 20px; color: #777;">لا توجد مصاريف مسجّلة بعد.</div>
+      </section>
+
+      <!-- ===== Tab: Reports ===== -->
       <section id="tab-reports" class="tab-panel">
         <div class="panel-toolbar">
           <h2>تقرير الحجوزات</h2>
-          <button id="printReportBtn" class="btn btn-primary">طباعة التقرير</button>
+        </div>
+        <div class="report-filters">
+          <label class="field-inline">
+            <span>الشهر</span>
+            <input type="month" id="reportMonthInput">
+          </label>
+          <label class="field-inline field-checkbox">
+            <input type="checkbox" id="reportAllTime">
+            <span>كل الفترات (بدون تصفية شهر)</span>
+          </label>
+          <div class="report-filters-actions">
+            <button id="printReportBtn" class="btn btn-primary">معاينة / طباعة / PDF</button>
+            <button id="exportExcelBtn" class="btn btn-light">📊 تصدير Excel</button>
+          </div>
         </div>
         <div id="reportSummary" class="summary-cards"></div>
         <div class="table-wrap">
@@ -225,6 +302,21 @@
               </tr>
             </thead>
             <tbody id="reportTableBody"></tbody>
+          </table>
+        </div>
+        <h3 class="report-subheading">المصاريف</h3>
+        <div class="table-wrap">
+          <table id="reportExpensesTable">
+            <thead>
+              <tr>
+                <th>الوصف</th>
+                <th>التصنيف</th>
+                <th>التاريخ</th>
+                <th>المبلغ</th>
+                <th>ملاحظات</th>
+              </tr>
+            </thead>
+            <tbody id="reportExpensesTableBody"></tbody>
           </table>
         </div>
       </section>
@@ -369,6 +461,11 @@
               </div>
               <div id="publicQrWrap" class="remote-qr-wrap"></div>
               <p class="field-hint" id="publicErrorText" style="color:#dc2626;"></p>
+              <div id="publicDiagActions" style="display:none;" class="remote-token-row">
+                <button type="button" id="copyDiagLogBtn" class="btn btn-light btn-small">📋 نسخ سجل التشخيص</button>
+                <button type="button" id="testConnectivityBtn" class="btn btn-light btn-small">🔎 فحص الاتصال بالإنترنت</button>
+              </div>
+              <p class="field-hint" id="connectivityResultText"></p>
               <p class="field-hint">⚠️ الرابط يتغيّر كل مرة تشغّل فيها هذا الخيار من جديد (رابط مؤقت مجاني). لرابط ثابت دائم، يحتاج إعداد إضافي لاحقاً.</p>
 
               <hr class="backup-divider">
@@ -476,15 +573,25 @@
           <h1 id="prHallName">قاعة الأفراح</h1>
         </div>
         <div class="receipt-meta">
-          <div class="receipt-meta-row"><span>تاريخ التقرير</span><strong id="prDate"></strong></div>
+          <div class="receipt-meta-row"><span>الفترة</span><strong id="prPeriod"></strong></div>
+          <div class="receipt-meta-row"><span>تاريخ الإصدار</span><strong id="prDate"></strong></div>
         </div>
       </div>
-      <div class="receipt-title-bar">تقرير الحجوزات</div>
+      <div class="receipt-title-bar">تقرير الحجوزات المالي</div>
+      <div class="summary-cards" id="prSummary"></div>
+      <div class="receipt-title-bar">الحجوزات</div>
       <table class="receipt-table" id="prTable">
         <thead>
           <tr><th>العميل</th><th>الهاتف</th><th>التاريخ</th><th>الدفع</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr>
         </thead>
         <tbody id="prTableBody"></tbody>
+      </table>
+      <div class="receipt-title-bar">المصاريف</div>
+      <table class="receipt-table" id="prExpensesTable">
+        <thead>
+          <tr><th>الوصف</th><th>التصنيف</th><th>التاريخ</th><th>المبلغ</th><th>ملاحظات</th></tr>
+        </thead>
+        <tbody id="prExpensesTableBody"></tbody>
       </table>
     </div>
   </div>

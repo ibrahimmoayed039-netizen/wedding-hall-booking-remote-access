@@ -80,12 +80,15 @@
     const publicUrlText = document.getElementById('publicUrlText');
     const publicQrWrap = document.getElementById('publicQrWrap');
     const publicErrorText = document.getElementById('publicErrorText');
+    const publicDiagActions = document.getElementById('publicDiagActions');
     if (!publicToggle) return;
 
     publicToggle.disabled = !info.enabled;
     publicToggle.checked = !!info.publicEnabled;
     publicDetails.style.display = info.publicEnabled ? 'block' : 'none';
     publicErrorText.textContent = '';
+    publicDiagActions.style.display = 'none';
+    window.__lastRemoteInfo = info;
 
     if (!info.enabled) {
       publicStatusText.textContent = 'فعّل "الوصول عن بُعد" أولاً بالأعلى';
@@ -107,7 +110,8 @@
     } else if (info.publicStatus === 'error') {
       publicStatusText.textContent = 'حصل خطأ';
       publicUrlText.textContent = '—';
-      publicErrorText.textContent = info.publicError || 'تعذر إنشاء الرابط العام.';
+      publicErrorText.textContent = (info.publicError || 'تعذر إنشاء الرابط العام.') + ' — لو استمر الفشل، استخدم بديل Radmin VPN الموضّح بالأعلى (موثوق ولا يعتمد على هذي الخدمة).';
+      publicDiagActions.style.display = 'flex';
       stopPublicPolling();
     } else {
       publicStatusText.textContent = 'جارِ إنشاء الرابط... (قد يأخذ عدة ثوانٍ)';
@@ -173,6 +177,39 @@
       await window.api.regenerateNtfyTopic();
       refreshRemoteInfo();
     });
+
+    const copyDiagBtn = document.getElementById('copyDiagLogBtn');
+    const testConnBtn = document.getElementById('testConnectivityBtn');
+    if (copyDiagBtn) {
+      copyDiagBtn.addEventListener('click', () => {
+        const info = window.__lastRemoteInfo || {};
+        const text = 'رسالة الخطأ:\n' + (info.publicError || '-') + '\n\nسجل التشخيص الخام:\n' + (info.publicDiagLog || '(فارغ)');
+        navigator.clipboard.writeText(text);
+        copyDiagBtn.textContent = 'تم النسخ ✓';
+        setTimeout(() => { copyDiagBtn.textContent = '📋 نسخ سجل التشخيص'; }, 1500);
+      });
+    }
+    if (testConnBtn) {
+      testConnBtn.addEventListener('click', async () => {
+        const resultEl = document.getElementById('connectivityResultText');
+        testConnBtn.disabled = true;
+        testConnBtn.textContent = 'جارِ الفحص...';
+        resultEl.textContent = '';
+        try {
+          const results = await window.api.testRemoteConnectivity();
+          resultEl.innerHTML = results.map(r => {
+            const icon = r.ok ? '✅' : '❌';
+            const detail = r.ok ? (r.ms + ' مللي ثانية') : (r.error || 'فشل');
+            return icon + ' ' + r.name + ': ' + detail;
+          }).join('<br>');
+        } catch (e) {
+          resultEl.textContent = 'تعذر تنفيذ الفحص.';
+        } finally {
+          testConnBtn.disabled = false;
+          testConnBtn.textContent = '🔎 فحص الاتصال بالإنترنت';
+        }
+      });
+    }
 
     if (window.api.onRemotePublicReady) {
       window.api.onRemotePublicReady(() => refreshRemoteInfo());

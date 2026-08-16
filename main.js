@@ -3,12 +3,14 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const Store = require('electron-store');
+const XLSX = require('xlsx');
 const { startServer, getLocalIPs } = require('./server');
 
 const store = new Store({
   name: 'hall-bookings-data',
   defaults: {
     bookings: [],
+    expenses: [],
     settings: {
       hallName: 'قاعة الأفراح',
       hallPhone: '',
@@ -33,6 +35,8 @@ let cloudflareTunnelHandle = null;
 let publicTunnelUrl = null;
 let publicTunnelStatus = 'stopped'; // stopped | connecting | ready | error
 let publicTunnelError = null;
+let publicTunnelDiagLog = []; // آخر أسطر تشخيصية من عملية cloudflared الفرعية (للمساعدة باكتشاف سبب الفشل)
+const TUNNEL_TIMEOUT_MS = 25000; // إذا ما جاء رابط خلال هذي المدة، على الأغلب الشبكة تمنع الاتصال
 let tunnelStarting = false; // يمنع تشغيل أكثر من نفق بنفس الوقت (سبب رئيسي لمشكلة الانهيار)
 
 // ---------- شبكة أمان: يمنع انهيار البرنامج بالكامل بسبب خلل داخلي بمكتبة cloudflared ----------
@@ -67,6 +71,18 @@ async function stopRemoteServer() {
 }
 
 // ---------- الرابط العام عبر Cloudflare Tunnel (بدون فتح منفذ بالراوتر) ----------
+function pushDiagLine(line) {
+  const clean = String(line || '').trim();
+  if (!clean) return;
+  publicTunnelDiagLog.push(clean);
+  if (publicTunnelDiagLog.length > 40) publicTunnelDiagLog.shift();
+}
+
+function diagSuffix() {
+  if (!publicTunnelDiagLog.length) return '';
+  return ' [سجل تشخيصي متاح - اضغط "نسخ سجل التشخيص" بالإعدادات]';
+}
+
 async function stopCloudflareTunnel() {
   if (cloudflareTunnelHandle) {
     try { cloudflareTunnelHandle.stop(); } catch (e) { /* تجاهل */ }
@@ -76,6 +92,7 @@ async function stopCloudflareTunnel() {
   publicTunnelUrl = null;
   publicTunnelStatus = 'stopped';
   publicTunnelError = null;
+  publicTunnelDiagLog = [];
 }
 
 async function startCloudflareTunnel(port) {
@@ -86,6 +103,7 @@ async function startCloudflareTunnel(port) {
   const { bin, install, tunnel } = require('cloudflared');
   publicTunnelStatus = 'connecting';
   publicTunnelError = null;
+  publicTunnelDiagLog = [];
   try {
     await install(bin); // يحمّل ملف cloudflared مرة واحدة فقط إذا ما كان موجود (يحتاج إنترنت أول مرة)
   } catch (err) {
@@ -105,24 +123,49 @@ async function startCloudflareTunnel(port) {
     if (child && typeof child.on === 'function') {
       child.on('error', (err) => {
         publicTunnelStatus = 'error';
-        publicTunnelError = String((err && err.message) || err);
+        publicTunnelError = 'تعذر تشغيل عملية أداة الربط: ' + String((err && err.message) || err);
       });
       child.on('exit', (code) => {
         if (publicTunnelStatus === 'ready' && code !== 0) {
           publicTunnelStatus = 'error';
-          publicTunnelError = 'توقفت أداة الربط بشكل غير متوقع (رمز الخروج: ' + code + ').';
+          publicTunnelError = 'توقفت أداة الربط بشكل غير متوقع (رمز الخروج: ' + code + ').' + diagSuffix();
           cloudflareTunnelHandle = null;
           publicTunnelUrl = null;
         }
       });
     }
-    publicTunnelUrl = await url;
+    // نلتقط سجل التشخيص الخام من cloudflared (stdout/stderr) - يفيد لمعرفة سبب الفشل الحقيقي
+    // (مثلاً: حظر DPI، رفض اتصال، DNS، مهلة انتهت) بدل رسالة عامة غير مفيدة
+    if (child && child.stderr && typeof child.stderr.on === 'function') {
+      child.stderr.on('data', (buf) => {
+        String(buf).split('\n').forEach(pushDiagLine);
+      });
+    }
+    if (child && child.stdout && typeof child.stdout.on === 'function') {
+      child.stdout.on('data', (buf) => {
+        String(buf).split('\n').forEach(pushDiagLine);
+      });
+    }
+
+    // مهلة زمنية: لو ما وصل رابط خلال المدة المحددة، الأغلب إن الشبكة تمنع الاتصال بخدمة النفق
+    // (وليس مجرد بطء) - نوقف المحاولة ونعطي تشخيص واضح بدل ترك الحالة "جارِ الإنشاء..." للأبد
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('TUNNEL_TIMEOUT')), TUNNEL_TIMEOUT_MS);
+    });
+    publicTunnelUrl = await Promise.race([url, timeoutPromise]);
     publicTunnelStatus = 'ready';
     if (mainWindow) mainWindow.webContents.send('remote:publicReady', publicTunnelUrl);
     notifyNewPublicUrl(publicTunnelUrl);
   } catch (err) {
+    try { cloudflareTunnelHandle && cloudflareTunnelHandle.stop(); } catch (e) { /* تجاهل */ }
+    cloudflareTunnelHandle = null;
     publicTunnelStatus = 'error';
-    publicTunnelError = String((err && err.message) || err);
+    if (err && err.message === 'TUNNEL_TIMEOUT') {
+      publicTunnelError = 'انتهت المهلة (' + (TUNNEL_TIMEOUT_MS / 1000) + ' ثانية) بدون الحصول على رابط - على الأغلب الشبكة/مزود الإنترنت يمنع الاتصال بخدمة النفق (Cloudflare Tunnel).' + diagSuffix()
+        + ' جرّب: 1) شبكة إنترنت أخرى (مثلاً بيانات الجوال) للتأكد، 2) أطفئ أي VPN أو برنامج حجب إعلانات، 3) لو تكرر الفشل استخدم بديل Radmin VPN (فعّال ولا يعتمد على هذي الخدمة إطلاقاً).';
+    } else {
+      publicTunnelError = String((err && err.message) || err) + diagSuffix();
+    }
   } finally {
     tunnelStarting = false;
   }
@@ -200,7 +243,8 @@ function performAutoBackup() {
       auto: true,
       exportedAt: new Date().toISOString(),
       settings: store.get('settings'),
-      bookings: store.get('bookings')
+      bookings: store.get('bookings'),
+      expenses: store.get('expenses')
     };
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filePath = path.join(AUTO_BACKUP_DIR, `auto-${stamp}.json`);
@@ -303,6 +347,38 @@ ipcMain.handle('bookings:replaceAll', (event, bookings) => {
   return store.get('bookings');
 });
 
+// ---------- IPC: Expenses CRUD (صندوق المصاريف) ----------
+
+ipcMain.handle('expenses:getAll', () => {
+  return store.get('expenses');
+});
+
+ipcMain.handle('expenses:save', (event, expense) => {
+  const expenses = store.get('expenses');
+  if (expense.id) {
+    const idx = expenses.findIndex(x => x.id === expense.id);
+    if (idx !== -1) {
+      expenses[idx] = expense;
+    } else {
+      expenses.push(expense);
+    }
+  } else {
+    expense.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    expense.createdAt = new Date().toISOString();
+    expenses.push(expense);
+  }
+  store.set('expenses', expenses);
+  performAutoBackup();
+  return expense;
+});
+
+ipcMain.handle('expenses:delete', (event, id) => {
+  const expenses = store.get('expenses').filter(x => x.id !== id);
+  store.set('expenses', expenses);
+  scheduleAutoBackup();
+  return true;
+});
+
 ipcMain.handle('settings:get', () => {
   return store.get('settings');
 });
@@ -329,6 +405,7 @@ function buildRemoteInfoResponse() {
     publicUrl: publicTunnelUrl,
     publicStatus: publicTunnelStatus,
     publicError: publicTunnelError,
+    publicDiagLog: publicTunnelDiagLog.join('\n'),
     ntfyTopic: remote.ntfyTopic || ''
   };
 }
@@ -368,6 +445,29 @@ ipcMain.handle('remote:regenerateNtfyTopic', async () => {
   settings.remoteAccess.ntfyTopic = 'hall-' + crypto.randomBytes(6).toString('hex');
   store.set('settings', settings);
   return settings.remoteAccess.ntfyTopic;
+});
+
+// ---------- IPC: تشخيص الاتصال بالإنترنت/خدمة النفق (يساعد بمعرفة سبب فشل الرابط العام) ----------
+ipcMain.handle('remote:testConnectivity', async () => {
+  async function checkUrl(name, testUrl, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const startedAt = Date.now();
+    try {
+      const res = await fetch(testUrl, { signal: controller.signal, method: 'GET' });
+      return { name, ok: true, status: res.status, ms: Date.now() - startedAt };
+    } catch (err) {
+      return { name, ok: false, error: String((err && err.message) || err), ms: Date.now() - startedAt };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  const results = await Promise.all([
+    checkUrl('إنترنت عام (google.com)', 'https://www.google.com/generate_204', 8000),
+    checkUrl('نطاق Cloudflare (cloudflare.com)', 'https://www.cloudflare.com', 8000),
+    checkUrl('نطاق الأنفاق (trycloudflare.com)', 'https://trycloudflare.com', 8000)
+  ]);
+  return results;
 });
 
 // ---------- IPC: Printing ----------
@@ -414,6 +514,47 @@ ipcMain.handle('print:toPDF', async (event, options) => {
       return { success: false, canceled: true };
     }
     fs.writeFileSync(result.filePath, data);
+    return { success: true, filePath: result.filePath };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('export:excel', async (event, payload) => {
+  try {
+    const { fileName, sheets } = payload || {};
+    const wb = XLSX.utils.book_new();
+    // فتح الملف باتجاه من اليمين لليسار (مناسب للمحتوى العربي) عند فتحه ببرنامج Excel
+    wb.Workbook = { Views: [{ RTL: true }] };
+
+    (sheets || []).forEach(sheet => {
+      const ws = XLSX.utils.aoa_to_sheet(sheet.rows || []);
+      // عرض أعمدة مناسب تلقائياً حسب أطول محتوى بكل عمود
+      const colCount = (sheet.rows && sheet.rows[0]) ? sheet.rows[0].length : 0;
+      const colWidths = [];
+      for (let c = 0; c < colCount; c++) {
+        let max = 8;
+        (sheet.rows || []).forEach(row => {
+          const cell = row[c];
+          const len = cell === null || cell === undefined ? 0 : String(cell).length;
+          if (len > max) max = len;
+        });
+        colWidths.push({ wch: Math.min(max + 2, 40) });
+      }
+      ws['!cols'] = colWidths;
+      XLSX.utils.book_append_sheet(wb, ws, (sheet.name || 'Sheet').slice(0, 31));
+    });
+
+    const defaultName = fileName || ('تقرير-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'حفظ تقرير Excel',
+      defaultPath: defaultName,
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }]
+    });
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true };
+    }
+    XLSX.writeFile(wb, result.filePath, { bookSST: false });
     return { success: true, filePath: result.filePath };
   } catch (err) {
     return { success: false, error: String(err) };

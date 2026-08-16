@@ -4,11 +4,15 @@ contextBridge.exposeInMainWorld('api', {
   getBookings: () => ipcRenderer.invoke('bookings:getAll'),
   saveBooking: (booking) => ipcRenderer.invoke('bookings:save', booking),
   deleteBooking: (id) => ipcRenderer.invoke('bookings:delete', id),
+  getExpenses: () => ipcRenderer.invoke('expenses:getAll'),
+  saveExpense: (expense) => ipcRenderer.invoke('expenses:save', expense),
+  deleteExpense: (id) => ipcRenderer.invoke('expenses:delete', id),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
   listPrinters: () => ipcRenderer.invoke('printers:list'),
   printContent: (options) => ipcRenderer.invoke('print:content', options),
   exportPDF: (options) => ipcRenderer.invoke('print:toPDF', options),
+  exportExcel: (payload) => ipcRenderer.invoke('export:excel', payload),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   replaceAllBookings: (bookings) => ipcRenderer.invoke('bookings:replaceAll', bookings),
   exportBackup: (jsonString) => ipcRenderer.invoke('backup:export', jsonString),
@@ -20,5 +24,6 @@ contextBridge.exposeInMainWorld('api', {
   setPublicEnabled: (enabled) => ipcRenderer.invoke('remote:setPublicEnabled', enabled),
   regenerateRemoteToken: () => ipcRenderer.invoke('remote:regenerateToken'),
   regenerateNtfyTopic: () => ipcRenderer.invoke('remote:regenerateNtfyTopic'),
+  testRemoteConnectivity: () => ipcRenderer.invoke('remote:testConnectivity'),
   onRemotePublicReady: (callback) => ipcRenderer.on('remote:publicReady', (event, url) => callback(url))
 });

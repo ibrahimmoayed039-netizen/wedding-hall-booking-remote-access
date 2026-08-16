@@ -63,6 +63,31 @@ body {
 .panel-toolbar h2 { margin-left: auto; }
 .panel-toolbar input { padding: 9px 12px; border: 1px solid #d8dae3; border-radius: 8px; font-size: 14px; }
 
+.report-filters {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  margin-bottom: 16px;
+}
+.report-filters .field-inline { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #4c4f5a; }
+.report-filters .field-inline span { font-weight: 600; }
+.report-filters input[type="month"] {
+  padding: 8px 10px;
+  border: 1px solid #d8dae3;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.report-filters .field-checkbox { gap: 6px; }
+.report-filters .field-checkbox input { width: 16px; height: 16px; }
+.report-filters-actions { display: flex; gap: 10px; margin-inline-start: auto; flex-wrap: wrap; }
+.report-subheading { color: #6d3b8f; margin: 22px 0 10px; }
+
 /* ---------- Table ---------- */
 .table-wrap { background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }

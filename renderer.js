@@ -1,4 +1,5 @@
 let bookings = [];
+let expenses = [];
 let settings = { hallName: 'قاعة الأفراح', hallPhone: '', hallAddress: '', foodPackages: [], printerName: '' };
 let currentInstallments = [];
 let currentFoodPackages = [];
@@ -11,6 +12,44 @@ function genId() {
 
 const $ = (id) => document.getElementById(id);
 
+// إصلاح مشكلة معروفة بالتطبيقات المبنية على Electron/ويندوز:
+// أحيانًا بعد إغلاق رسالة تنبيه (alert)، مثل "لا يوجد رقم هاتف صالح..."،
+// تفقد نافذة البرنامج التركيز (focus) ويتوقف استقبال الكتابة بجميع الحقول
+// حتى يعيد المستخدم فتح البرنامج من جديد. هذا الإصلاح يعيد التركيز تلقائيًا
+// للنافذة والصفحة فور إغلاق أي رسالة تنبيه أو تأكيد، حتى تستمر الكتابة بشكل طبيعي.
+function restoreFocusAfterDialog() {
+  setTimeout(() => {
+    try { window.focus(); } catch (e) { /* تجاهل */ }
+    try {
+      if (document.activeElement && document.activeElement !== document.body) {
+        document.activeElement.blur();
+      }
+      document.body.focus();
+    } catch (e) { /* تجاهل */ }
+  }, 30);
+}
+
+const nativeAlert = window.alert.bind(window);
+window.alert = function (message) {
+  const result = nativeAlert(message);
+  restoreFocusAfterDialog();
+  return result;
+};
+
+const nativeConfirm = window.confirm.bind(window);
+window.confirm = function (message) {
+  const result = nativeConfirm(message);
+  restoreFocusAfterDialog();
+  return result;
+};
+
+const nativePrompt = window.prompt.bind(window);
+window.prompt = function (message, defaultValue) {
+  const result = nativePrompt(message, defaultValue);
+  restoreFocusAfterDialog();
+  return result;
+};
+
 // ---------------- Tabs ----------------
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -22,11 +61,13 @@ function switchTab(tab) {
   $('tab-' + tab).classList.add('active');
   if (tab === 'reports') renderReport();
   if (tab === 'availability') renderAvailabilityCalendar();
+  if (tab === 'expenses') renderExpensesTable();
 }
 
 // ---------------- Init ----------------
 async function init() {
   bookings = await window.api.getBookings();
+  expenses = await window.api.getExpenses();
   settings = await window.api.getSettings();
   if (!settings.foodPackages) settings.foodPackages = [];
   if (!settings.printerName) settings.printerName = '';
@@ -667,22 +708,181 @@ function loadBookingIntoForm(b) {
 }
 
 // ---------------- Reports ----------------
-function renderReport() {
-  const totalBookings = bookings.length;
-  const totalRevenue = bookings.reduce((s, b) => s + (Number(b.totalAmount) || 0), 0);
-  const totalPaid = bookings.reduce((s, b) => s + (Number(b.paidAmount) || 0), 0);
-  const totalDue = totalRevenue - totalPaid;
+// ---------------- Expenses (صندوق المصاريف) ----------------
+function renderExpensesTable() {
+  const monthFilter = $('expenseMonthFilter').value; // format YYYY-MM
+  let list = expenses.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+  if (monthFilter) {
+    list = list.filter(x => (x.date || '').startsWith(monthFilter));
+  }
 
-  $('reportSummary').innerHTML = `
-    <div class="summary-card"><div class="label">عدد الحجوزات</div><div class="value">${totalBookings}</div></div>
-    <div class="summary-card"><div class="label">إجمالي المبالغ</div><div class="value">${formatMoney(totalRevenue)}</div></div>
-    <div class="summary-card"><div class="label">المبالغ المحصّلة</div><div class="value">${formatMoney(totalPaid)}</div></div>
-    <div class="summary-card"><div class="label">المتبقي</div><div class="value">${formatMoney(totalDue)}</div></div>
+  const total = list.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const byCategory = {};
+  list.forEach(x => {
+    const cat = x.category || 'أخرى';
+    byCategory[cat] = (byCategory[cat] || 0) + (Number(x.amount) || 0);
+  });
+  const topCategory = Object.keys(byCategory).sort((a, b) => byCategory[b] - byCategory[a])[0];
+
+  $('expenseSummary').innerHTML = `
+    <div class="summary-card"><div class="label">عدد المصاريف${monthFilter ? ' (الشهر المحدد)' : ''}</div><div class="value">${list.length}</div></div>
+    <div class="summary-card"><div class="label">إجمالي المصاريف${monthFilter ? ' (الشهر المحدد)' : ''}</div><div class="value">${formatMoney(total)}</div></div>
+    <div class="summary-card"><div class="label">أعلى بند</div><div class="value">${topCategory ? escapeHtml(topCategory) : '—'}</div></div>
   `;
+
+  const body = $('expensesTableBody');
+  body.innerHTML = '';
+  list.forEach(x => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(x.description)}</td>
+      <td>${escapeHtml(x.category || 'أخرى')}</td>
+      <td>${escapeHtml(x.date)}</td>
+      <td>${formatMoney(x.amount)}</td>
+      <td>
+        <button class="btn btn-light btn-small" data-action="editExpense" data-id="${x.id}">تعديل</button>
+        <button class="btn btn-danger btn-small" data-action="deleteExpense" data-id="${x.id}">حذف</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+
+  $('expensesEmptyState').style.display = list.length === 0 ? 'block' : 'none';
+}
+
+$('expenseMonthFilter').addEventListener('input', renderExpensesTable);
+$('clearExpenseFilter').addEventListener('click', () => {
+  $('expenseMonthFilter').value = '';
+  renderExpensesTable();
+});
+
+$('expenseForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const expense = {
+    id: $('expenseId').value || null,
+    description: $('expenseDescription').value.trim(),
+    category: $('expenseCategory').value,
+    amount: Number($('expenseAmount').value) || 0,
+    date: $('expenseDate').value,
+    notes: $('expenseNotes').value.trim()
+  };
+  if (!expense.description || !expense.amount || !expense.date) {
+    alert('الرجاء تعبئة الوصف والمبلغ والتاريخ.');
+    return;
+  }
+  const saved = await window.api.saveExpense(expense);
+  const idx = expenses.findIndex(x => x.id === saved.id);
+  if (idx !== -1) expenses[idx] = saved; else expenses.push(saved);
+
+  resetExpenseForm();
+  renderExpensesTable();
+});
+
+$('resetExpenseFormBtn').addEventListener('click', resetExpenseForm);
+
+function resetExpenseForm() {
+  $('expenseForm').reset();
+  $('expenseId').value = '';
+  $('expenseFormTitle').textContent = 'إضافة مصروف';
+  $('expenseCategory').value = 'تشغيلية';
+}
+
+function loadExpenseIntoForm(x) {
+  $('expenseId').value = x.id;
+  $('expenseFormTitle').textContent = 'تعديل مصروف';
+  $('expenseDescription').value = x.description || '';
+  $('expenseCategory').value = x.category || 'تشغيلية';
+  $('expenseAmount').value = x.amount || 0;
+  $('expenseDate').value = x.date || '';
+  $('expenseNotes').value = x.notes || '';
+}
+
+$('expensesTableBody').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const action = btn.dataset.action;
+  const expense = expenses.find(x => x.id === id);
+  if (!expense) return;
+
+  if (action === 'editExpense') {
+    loadExpenseIntoForm(expense);
+  } else if (action === 'deleteExpense') {
+    if (confirm(`تأكيد حذف مصروف "${expense.description}"؟`)) {
+      await window.api.deleteExpense(id);
+      expenses = expenses.filter(x => x.id !== id);
+      renderExpensesTable();
+    }
+  }
+});
+
+
+// ---------------- Report period filter ----------------
+function currentMonthStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getReportPeriod() {
+  const allTime = $('reportAllTime').checked;
+  const month = $('reportMonthInput').value || currentMonthStr();
+  return { allTime, month };
+}
+
+function reportPeriodLabel(period) {
+  if (period.allTime) return 'كل الفترات';
+  const [y, m] = period.month.split('-').map(Number);
+  const monthsAr = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  return `${monthsAr[(m || 1) - 1]} ${y}`;
+}
+
+function getReportBookings(period) {
+  return bookings
+    .filter(b => period.allTime || (b.eventDate && b.eventDate.startsWith(period.month)))
+    .slice()
+    .sort((a, b) => (a.eventDate < b.eventDate ? 1 : -1));
+}
+
+function getReportExpenses(period) {
+  return expenses
+    .filter(x => period.allTime || (x.date && x.date.startsWith(period.month)))
+    .slice()
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+function computeReportTotals(reportBookings, reportExpenses) {
+  const totalBookings = reportBookings.length;
+  const totalRevenue = reportBookings.reduce((s, b) => s + (Number(b.totalAmount) || 0), 0);
+  const totalPaid = reportBookings.reduce((s, b) => s + (Number(b.paidAmount) || 0), 0);
+  const totalDue = totalRevenue - totalPaid;
+  const totalExpenses = reportExpenses.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  // الربح يُحسب من المبالغ المُحصَّلة فعليًا (المدفوعة) بعد خصم المصاريف،
+  // وليس من إجمالي الحجوزات، لأن المتبقي غير المحصَّل ليس ربحًا فعليًا بعد.
+  const netProfit = totalPaid - totalExpenses;
+  return { totalBookings, totalRevenue, totalPaid, totalDue, totalExpenses, netProfit };
+}
+
+function summaryCardsHtml(totals) {
+  return `
+    <div class="summary-card"><div class="label">عدد الحجوزات</div><div class="value">${totals.totalBookings}</div></div>
+    <div class="summary-card"><div class="label">إجمالي المبالغ</div><div class="value">${formatMoney(totals.totalRevenue)}</div></div>
+    <div class="summary-card"><div class="label">المبالغ المحصّلة</div><div class="value">${formatMoney(totals.totalPaid)}</div></div>
+    <div class="summary-card"><div class="label">المتبقي</div><div class="value">${formatMoney(totals.totalDue)}</div></div>
+    <div class="summary-card"><div class="label">إجمالي المصاريف</div><div class="value">${formatMoney(totals.totalExpenses)}</div></div>
+    <div class="summary-card"><div class="label">صافي الربح</div><div class="value ${totals.netProfit >= 0 ? 'status-paid' : 'status-due'}">${formatMoney(totals.netProfit)}</div></div>
+  `;
+}
+
+function renderReport() {
+  const period = getReportPeriod();
+  const reportBookings = getReportBookings(period);
+  const reportExpenses = getReportExpenses(period);
+  const totals = computeReportTotals(reportBookings, reportExpenses);
+
+  $('reportSummary').innerHTML = summaryCardsHtml(totals);
 
   const body = $('reportTableBody');
   body.innerHTML = '';
-  bookings.slice().sort((a, b) => (a.eventDate < b.eventDate ? 1 : -1)).forEach(b => {
+  reportBookings.forEach(b => {
     const remaining = (Number(b.totalAmount) || 0) - (Number(b.paidAmount) || 0);
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -696,7 +896,33 @@ function renderReport() {
       <td>${remaining > 0 ? `<button class="btn btn-success btn-small" data-action="settle" data-id="${b.id}">تسديد</button>` : '-'}</td>`;
     body.appendChild(tr);
   });
+  if (!reportBookings.length) {
+    body.innerHTML = '<tr><td colspan="8" class="empty-state">لا توجد حجوزات في هذه الفترة</td></tr>';
+  }
+
+  const expBody = $('reportExpensesTableBody');
+  expBody.innerHTML = '';
+  reportExpenses.forEach(x => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(x.description)}</td>
+      <td>${escapeHtml(x.category)}</td>
+      <td>${escapeHtml(x.date)}</td>
+      <td>${formatMoney(x.amount)}</td>
+      <td>${escapeHtml(x.notes)}</td>`;
+    expBody.appendChild(tr);
+  });
+  if (!reportExpenses.length) {
+    expBody.innerHTML = '<tr><td colspan="5" class="empty-state">لا توجد مصاريف في هذه الفترة</td></tr>';
+  }
 }
+
+$('reportMonthInput').addEventListener('change', renderReport);
+$('reportAllTime').addEventListener('change', () => {
+  $('reportMonthInput').disabled = $('reportAllTime').checked;
+  renderReport();
+});
+if (!$('reportMonthInput').value) $('reportMonthInput').value = currentMonthStr();
 
 $('reportTableBody').addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-action="settle"]');
@@ -704,12 +930,26 @@ $('reportTableBody').addEventListener('click', (e) => {
   settleRemainingDebt(btn.dataset.id);
 });
 
+function reportFileBaseName(period) {
+  const safeHall = (settings.hallName || 'القاعة').replace(/[\\/:*?"<>|]/g, '-');
+  const periodPart = period.allTime ? 'كل-الفترات' : period.month;
+  return `تقرير-${safeHall}-${periodPart}`;
+}
+
 $('printReportBtn').addEventListener('click', () => {
+  const period = getReportPeriod();
+  const reportBookings = getReportBookings(period);
+  const reportExpenses = getReportExpenses(period);
+  const totals = computeReportTotals(reportBookings, reportExpenses);
+
   $('prHallName').textContent = settings.hallName || 'قاعة الأفراح';
+  $('prPeriod').textContent = reportPeriodLabel(period);
   $('prDate').textContent = new Date().toLocaleDateString('ar-EG');
+  $('prSummary').innerHTML = summaryCardsHtml(totals);
+
   const body = $('prTableBody');
   body.innerHTML = '';
-  bookings.slice().sort((a, b) => (a.eventDate < b.eventDate ? 1 : -1)).forEach(b => {
+  reportBookings.forEach(b => {
     const remaining = (Number(b.totalAmount) || 0) - (Number(b.paidAmount) || 0);
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -722,7 +962,83 @@ $('printReportBtn').addEventListener('click', () => {
       <td>${formatMoney(remaining)}</td>`;
     body.appendChild(tr);
   });
-  showPrintPreview('printReportArea', 'معاينة تقرير الحجوزات', 'تقرير-الحجوزات.pdf');
+
+  const expBody = $('prExpensesTableBody');
+  expBody.innerHTML = '';
+  reportExpenses.forEach(x => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(x.description)}</td>
+      <td>${escapeHtml(x.category)}</td>
+      <td>${escapeHtml(x.date)}</td>
+      <td>${formatMoney(x.amount)}</td>
+      <td>${escapeHtml(x.notes)}</td>`;
+    expBody.appendChild(tr);
+  });
+
+  showPrintPreview('printReportArea', 'معاينة تقرير الحجوزات', reportFileBaseName(period) + '.pdf');
+});
+
+$('exportExcelBtn').addEventListener('click', async () => {
+  const period = getReportPeriod();
+  const reportBookings = getReportBookings(period);
+  const reportExpenses = getReportExpenses(period);
+  const totals = computeReportTotals(reportBookings, reportExpenses);
+
+  const summarySheet = [
+    ['تقرير الحجوزات المالي'],
+    ['القاعة', settings.hallName || 'قاعة الأفراح'],
+    ['الفترة', reportPeriodLabel(period)],
+    ['تاريخ الإصدار', new Date().toLocaleDateString('ar-EG')],
+    [],
+    ['البند', 'القيمة'],
+    ['عدد الحجوزات', totals.totalBookings],
+    ['إجمالي المبالغ', totals.totalRevenue],
+    ['المبالغ المحصّلة', totals.totalPaid],
+    ['المتبقي', totals.totalDue],
+    ['إجمالي المصاريف', totals.totalExpenses],
+    ['صافي الربح', totals.netProfit]
+  ];
+
+  const bookingsSheet = [
+    ['اسم العميل', 'الهاتف', 'تاريخ الحفلة', 'طريقة الدفع', 'الإجمالي', 'المدفوع', 'المتبقي']
+  ];
+  reportBookings.forEach(b => {
+    const remaining = (Number(b.totalAmount) || 0) - (Number(b.paidAmount) || 0);
+    bookingsSheet.push([b.customerName || '', b.phone || '', b.eventDate || '', b.paymentType || '', Number(b.totalAmount) || 0, Number(b.paidAmount) || 0, remaining]);
+  });
+
+  const expensesSheet = [
+    ['الوصف', 'التصنيف', 'التاريخ', 'المبلغ', 'ملاحظات']
+  ];
+  reportExpenses.forEach(x => {
+    expensesSheet.push([x.description || '', x.category || '', x.date || '', Number(x.amount) || 0, x.notes || '']);
+  });
+
+  const btn = $('exportExcelBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'جارِ التصدير...';
+  try {
+    const result = await window.api.exportExcel({
+      fileName: reportFileBaseName(period) + '.xlsx',
+      sheets: [
+        { name: 'الملخص', rows: summarySheet },
+        { name: 'الحجوزات', rows: bookingsSheet },
+        { name: 'المصاريف', rows: expensesSheet }
+      ]
+    });
+    if (result && result.success) {
+      alert('تم حفظ ملف Excel بنجاح في:\n' + result.filePath);
+    } else if (!result || !result.canceled) {
+      alert('تعذّر إنشاء ملف Excel. حاول مرة أخرى.');
+    }
+  } catch (err) {
+    alert('تعذّر إنشاء ملف Excel. حاول مرة أخرى.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 });
 
 // ---------------- Monthly Availability ----------------

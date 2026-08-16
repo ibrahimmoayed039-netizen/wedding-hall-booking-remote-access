@@ -20,6 +20,13 @@
   #contentWrap{position:absolute;top:48px;left:0;right:0;bottom:0;overflow-y:auto;padding:10px 12px 20px;}
   #contentWrap.with-banner{top:80px;}
 
+  .tabs{display:flex;gap:6px;margin-bottom:10px;}
+  .tab-btn{flex:1;padding:9px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:var(--muted);font-size:13px;font-weight:600;}
+  .tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
   .search{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:var(--text);font-size:14px;margin-bottom:10px;}
   .card{background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:10px;border-inline-start:4px solid var(--accent);}
   .card .row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
@@ -32,11 +39,54 @@
   .paid-partial{color:var(--warn);}
   .paid-none{color:var(--danger);}
   .status-line{font-size:11.5px;margin-top:6px;font-weight:600;}
+  .more-hint{font-size:10.5px;color:#64748b;text-align:center;margin-top:6px;}
   .empty,.err{text-align:center;color:var(--muted);padding:40px 16px;font-size:13px;}
   .updated{font-size:11px;color:var(--muted);text-align:center;padding:10px 0 2px;}
   .refresh{position:fixed;bottom:16px;left:16px;background:var(--accent);color:#fff;border:none;border-radius:999px;width:48px;height:48px;font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:8;}
   .refresh.spinning{animation:spin 0.8s linear infinite;}
   @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+
+  /* ---------- Calendar view ---------- */
+  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .cal-nav button{background:#1e293b;border:1px solid #334155;color:var(--text);border-radius:8px;padding:8px 14px;font-size:15px;}
+  .cal-nav h3{color:var(--text);font-size:15px;margin:0;}
+  .cal-summary{display:flex;gap:8px;margin-bottom:12px;}
+  .cal-summary .chip{flex:1;background:var(--card);border-radius:10px;padding:8px 4px;text-align:center;font-size:11px;color:var(--muted);}
+  .cal-summary .chip b{display:block;font-size:16px;margin-top:2px;}
+  .cal-summary .chip.total b{color:var(--text);}
+  .cal-summary .chip.avail b{color:var(--ok);}
+  .cal-summary .chip.booked b{color:var(--danger);}
+  .cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:5px;}
+  .cal-weekdays span{text-align:center;font-size:10.5px;color:var(--muted);}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+  .cal-day{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;padding:2px;overflow:hidden;}
+  .cal-day.empty{visibility:hidden;}
+  .cal-day.booked{background:#3a1220;color:#fca5a5;border:1px solid #7f1d1d;}
+  .cal-day.available{background:#0f2e1c;color:#86efac;border:1px solid #14532d;}
+  .cal-day.past{background:#1a2232;color:#475569;border:1px solid #263041;}
+  .cal-day.today{outline:2px solid var(--accent);outline-offset:-1px;}
+  .cal-day-num{font-weight:700;font-size:13px;}
+  .cal-day-name{font-size:8px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px;}
+  .cal-legend{display:flex;gap:14px;justify-content:center;margin-top:14px;font-size:11px;color:var(--muted);}
+  .cal-legend span{display:flex;align-items:center;gap:5px;}
+  .cal-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+  .cal-legend i.b{background:#7f1d1d;}
+  .cal-legend i.a{background:#14532d;}
+  .cal-legend i.p{background:#263041;}
+
+  /* ---------- Detail bottom sheet ---------- */
+  #detailModal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:30;display:none;align-items:flex-end;justify-content:center;}
+  #detailModal.open{display:flex;}
+  .detail-sheet{background:var(--card);width:100%;max-width:480px;border-radius:16px 16px 0 0;padding:18px 18px 26px;max-height:82vh;overflow-y:auto;}
+  .detail-sheet h2{color:var(--text);font-size:17px;margin:0 0 2px;}
+  .detail-sheet .d-date{color:var(--muted);font-size:12.5px;margin-bottom:14px;}
+  .d-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #2a3547;font-size:13px;}
+  .d-row:last-of-type{border-bottom:none;}
+  .d-row span:first-child{color:var(--muted);}
+  .d-row span:last-child{color:var(--text);font-weight:600;text-align:left;}
+  .d-notes{margin-top:12px;background:#0b1220;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#cbd5e1;line-height:1.6;}
+  .d-notes b{display:block;margin-bottom:4px;color:var(--muted);font-size:11px;}
+  #closeDetailBtn{width:100%;margin-top:16px;padding:12px;border:none;border-radius:10px;background:#334155;color:var(--text);font-size:14px;font-weight:600;}
 
   #settingsScreen{position:fixed;inset:0;background:var(--bg);z-index:20;display:flex;flex-direction:column;justify-content:center;padding:24px;}
   #settingsScreen h2{color:var(--text);font-size:18px;margin-bottom:4px;}
@@ -59,11 +109,63 @@
   <div id="statusBanner"></div>
 
   <div id="contentWrap">
-    <input class="search" id="searchBox" placeholder="بحث بالاسم أو رقم الهاتف أو التاريخ..." oninput="renderList()">
-    <div id="list"></div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tabListBtn" onclick="switchView('list')">📋 القائمة</button>
+      <button class="tab-btn" id="tabCalBtn" onclick="switchView('calendar')">📅 الأيام المتاحة والمحجوزة</button>
+    </div>
+
+    <div class="view active" id="viewList">
+      <input class="search" id="searchBox" placeholder="بحث بالاسم أو رقم الهاتف أو التاريخ..." oninput="renderList()">
+      <div id="list"></div>
+    </div>
+
+    <div class="view" id="viewCalendar">
+      <div class="cal-nav">
+        <button onclick="changeCalMonth(-1)">‹ السابق</button>
+        <h3 id="calMonthLabel"></h3>
+        <button onclick="changeCalMonth(1)">التالي ›</button>
+      </div>
+      <div class="cal-summary">
+        <div class="chip total"><span>أيام الشهر</span><b id="calTotalDays">0</b></div>
+        <div class="chip avail"><span>أيام متاحة</span><b id="calAvailDays">0</b></div>
+        <div class="chip booked"><span>أيام محجوزة</span><b id="calBookedDays">0</b></div>
+      </div>
+      <div class="cal-weekdays" id="calWeekdays"></div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-legend">
+        <span><i class="b"></i> محجوز</span>
+        <span><i class="a"></i> متاح</span>
+        <span><i class="p"></i> منتهٍ</span>
+      </div>
+    </div>
+
     <div class="updated" id="updatedAt"></div>
   </div>
   <button class="refresh" id="refreshBtn" onclick="loadData()" title="تحديث">⟳</button>
+
+  <!-- ===== Detail bottom sheet ===== -->
+  <div id="detailModal" onclick="if(event.target===this) closeDetail()">
+    <div class="detail-sheet">
+      <h2 id="dName"></h2>
+      <div class="d-date" id="dDate"></div>
+      <div class="d-row"><span>رقم الهاتف</span><span id="dPhone">-</span></div>
+      <div class="d-row"><span>تاريخ الاستحقاق</span><span id="dDueDate">-</span></div>
+      <div class="d-row"><span>طريقة الدفع</span><span id="dPaymentType">-</span></div>
+      <div class="d-row"><span>مكان الطعام</span><span id="dFoodLocation">-</span></div>
+      <div class="d-row"><span>المنسق</span><span id="dCoordinator">-</span></div>
+      <div class="d-row"><span>الدي جي</span><span id="dDj">-</span></div>
+      <div class="d-row"><span>المصور</span><span id="dPhotographer">-</span></div>
+      <div class="d-row"><span>عدد المساعدين</span><span id="dAssistants">-</span></div>
+      <div class="d-row"><span>الإجمالي</span><span id="dTotal">-</span></div>
+      <div class="d-row"><span>المدفوع</span><span id="dPaid">-</span></div>
+      <div class="d-row"><span>المتبقي</span><span id="dRemaining">-</span></div>
+      <div class="d-notes" id="dNotesWrap" style="display:none;">
+        <b>ملاحظات</b>
+        <span id="dNotes"></span>
+      </div>
+      <button id="closeDetailBtn" onclick="closeDetail()">إغلاق</button>
+    </div>
+  </div>
 
   <div id="settingsScreen" style="display:none;">
     <h2>إعداد الاتصال بالخادم</h2>
@@ -88,6 +190,12 @@
 let bookings = [];
 let lastSyncedAt = null;
 let isLoading = false;
+let currentView = 'list';
+
+const ARABIC_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const ARABIC_WEEKDAYS = ['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'];
+const todayObj = new Date();
+let calendarView = { year: todayObj.getFullYear(), month: todayObj.getMonth() };
 
 function apiBase(){
   let addr = (localStorage.getItem('serverAddr') || '').trim();
@@ -252,7 +360,7 @@ async function loadData(){
     clearTimeout(timeout);
     isLoading = false;
     document.getElementById('refreshBtn').classList.remove('spinning');
-    renderList();
+    renderCurrentView();
   }
 }
 
@@ -260,6 +368,19 @@ function statusInfo(remaining, paid){
   if (remaining <= 0) return { cls: 'paid-full', label: 'مدفوع بالكامل' };
   if (paid > 0) return { cls: 'paid-partial', label: 'دفعة جزئية' };
   return { cls: 'paid-none', label: 'غير مدفوع' };
+}
+
+// ---------- تبديل العرض: قائمة / تقويم ----------
+function switchView(view){
+  currentView = view;
+  document.getElementById('tabListBtn').classList.toggle('active', view === 'list');
+  document.getElementById('tabCalBtn').classList.toggle('active', view === 'calendar');
+  document.getElementById('viewList').classList.toggle('active', view === 'list');
+  document.getElementById('viewCalendar').classList.toggle('active', view === 'calendar');
+  renderCurrentView();
+}
+function renderCurrentView(){
+  if (currentView === 'calendar') renderCalendar(); else renderList();
 }
 
 function renderList(){
@@ -271,24 +392,149 @@ function renderList(){
   if (items.length === 0) {
     list.innerHTML = '<div class="empty">لا توجد بيانات لعرضها</div>';
   } else {
-    list.innerHTML = items.map(b => {
+    list.innerHTML = items.map((b, idx) => {
       const total = Number(b.totalAmount)||0;
       const paid = Number(b.paidAmount)||0;
       const remaining = b.remaining != null ? b.remaining : Math.max(0, total - paid);
       const s = statusInfo(remaining, paid);
       let meta = b.phone ? ('<span>📞 ' + esc(b.phone) + '</span>') : '';
+      if (b.paymentType) meta += '<span>💳 ' + esc(b.paymentType) + '</span>';
+      if (b.foodLocation) meta += '<span>🍽️ ' + esc(b.foodLocation) + '</span>';
       if (b.coordinatorName) meta += '<span>🎤 ' + esc(b.coordinatorName) + '</span>';
       if (b.djName) meta += '<span>🎧 ' + esc(b.djName) + '</span>';
       if (b.photographerName) meta += '<span>📷 ' + esc(b.photographerName) + '</span>';
-      return '<div class="card">'
+      if (b.assistantsCount) meta += '<span>👥 ' + esc(String(b.assistantsCount)) + '</span>';
+      return '<div class="card" data-idx="' + idx + '" onclick="openDetailByIndex(this)">'
         + '<div class="row1"><span class="name">' + esc(b.customerName) + '</span><span class="date">' + esc(b.eventDate) + '</span></div>'
         + '<div class="meta">' + meta + '</div>'
         + '<div class="money"><span>الإجمالي: <b>' + fmt(total) + '</b></span><span>المتبقي: <b class="' + s.cls + '">' + fmt(remaining) + '</b></span></div>'
         + '<div class="status-line ' + s.cls + '">' + s.label + '</div>'
+        + '<div class="more-hint">اضغط لعرض كل التفاصيل ›</div>'
         + '</div>';
     }).join('');
   }
+  updateUpdatedLabel();
+}
+// نحتفظ بنفس ترتيب/تصفية القائمة المعروضة حاليًا للوصول إليها عند الضغط على بطاقة
+function openDetailByIndex(el){
+  const q = (document.getElementById('searchBox').value || '').trim();
+  let items = bookings.slice().sort((a,b)=> (a.eventDate||'').localeCompare(b.eventDate||''));
+  if (q) items = items.filter(b => ((b.customerName||'')+(b.phone||'')+(b.eventDate||'')).includes(q));
+  const idx = Number(el.dataset.idx);
+  const booking = items[idx];
+  if (booking) openDetail(booking);
+}
 
+// ---------- عرض التقويم: الأيام المتاحة والمحجوزة ----------
+function pad2(n){ return String(n).padStart(2, '0'); }
+function toDateStr(y, m, d){ return y + '-' + pad2(m + 1) + '-' + pad2(d); }
+function calTodayStr(){ return toDateStr(todayObj.getFullYear(), todayObj.getMonth(), todayObj.getDate()); }
+
+function changeCalMonth(delta){
+  calendarView.month += delta;
+  if (calendarView.month < 0) { calendarView.month = 11; calendarView.year--; }
+  if (calendarView.month > 11) { calendarView.month = 0; calendarView.year++; }
+  renderCalendar();
+}
+
+function renderCalendar(){
+  const { year, month } = calendarView;
+  document.getElementById('calMonthLabel').textContent = ARABIC_MONTHS[month] + ' ' + year;
+
+  const weekdaysEl = document.getElementById('calWeekdays');
+  weekdaysEl.innerHTML = ARABIC_WEEKDAYS.map(w => '<span>' + w + '</span>').join('');
+
+  const bookingsByDate = {};
+  bookings.forEach(b => { if (b.eventDate) bookingsByDate[b.eventDate] = b; });
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const tStr = calTodayStr();
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  for (let i = 0; i < firstWeekday; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'cal-day empty';
+    grid.appendChild(empty);
+  }
+
+  let availableCount = 0;
+  let bookedCount = 0;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = toDateStr(year, month, d);
+    const booking = bookingsByDate[dateStr];
+    const isPast = dateStr < tStr;
+    const isToday = dateStr === tStr;
+
+    const cell = document.createElement('div');
+    let cls = 'cal-day';
+    let nameHtml = '';
+
+    if (booking) {
+      bookedCount++;
+      cls += ' booked';
+      nameHtml = '<span class="cal-day-name">' + esc(booking.customerName || 'محجوز') + '</span>';
+      cell.onclick = () => openDetail(booking);
+    } else if (isPast) {
+      cls += ' past';
+    } else {
+      availableCount++;
+      cls += ' available';
+    }
+    if (isToday) cls += ' today';
+    cell.className = cls;
+    cell.innerHTML = '<span class="cal-day-num">' + d + '</span>' + nameHtml;
+    grid.appendChild(cell);
+  }
+
+  document.getElementById('calTotalDays').textContent = daysInMonth;
+  document.getElementById('calAvailDays').textContent = availableCount;
+  document.getElementById('calBookedDays').textContent = bookedCount;
+  updateUpdatedLabel();
+}
+
+// ---------- شاشة تفاصيل الحجز الكاملة ----------
+function openDetail(b){
+  const total = Number(b.totalAmount)||0;
+  const paid = Number(b.paidAmount)||0;
+  const remaining = b.remaining != null ? b.remaining : Math.max(0, total - paid);
+  const s = statusInfo(remaining, paid);
+
+  document.getElementById('dName').textContent = b.customerName || '-';
+  document.getElementById('dDate').textContent = 'تاريخ الحفلة: ' + (b.eventDate || '-');
+  document.getElementById('dPhone').textContent = b.phone || '-';
+  document.getElementById('dDueDate').textContent = b.dueDate || '-';
+  document.getElementById('dPaymentType').textContent = b.paymentType || '-';
+  document.getElementById('dFoodLocation').textContent = b.foodLocation || '-';
+  document.getElementById('dCoordinator').textContent = b.coordinatorName || '-';
+  document.getElementById('dDj').textContent = b.djName || '-';
+  document.getElementById('dPhotographer').textContent = b.photographerName || '-';
+  document.getElementById('dAssistants').textContent = b.assistantsCount ? String(b.assistantsCount) : '-';
+  document.getElementById('dTotal').textContent = fmt(total);
+  const paidEl = document.getElementById('dPaid');
+  paidEl.textContent = fmt(paid);
+  const remEl = document.getElementById('dRemaining');
+  remEl.textContent = fmt(remaining) + ' (' + s.label + ')';
+  remEl.className = s.cls;
+
+  const notesWrap = document.getElementById('dNotesWrap');
+  if (b.notes) {
+    notesWrap.style.display = 'block';
+    document.getElementById('dNotes').textContent = b.notes;
+  } else {
+    notesWrap.style.display = 'none';
+  }
+
+  document.getElementById('detailModal').classList.add('open');
+}
+function closeDetail(){
+  document.getElementById('detailModal').classList.remove('open');
+}
+
+function updateUpdatedLabel(){
   const updatedEl = document.getElementById('updatedAt');
   updatedEl.textContent = lastSyncedAt ? ('آخر تحديث: ' + new Date(lastSyncedAt).toLocaleString('ar')) : '';
 }
@@ -306,7 +552,7 @@ function esc(s){ return String(s||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&
   }
   // اعرض آخر نسخة محفوظة فوراً (بدون انتظار الشبكة)، ثم حاول التحديث
   loadCache();
-  renderList();
+  renderCurrentView();
   loadData();
 })();
 </script>
