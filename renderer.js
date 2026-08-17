@@ -13,6 +13,77 @@ function genId() {
 
 const $ = (id) => document.getElementById(id);
 
+// ---------------- نوافذ تنبيه/تأكيد مخصصة ----------------
+// بديل عن alert()/confirm() الأصلية بالمتصفح: النوافذ الأصلية تعطّل خيط الواجهة بشكل متزامن،
+// وأحياناً بـ Electron لا يرجع تركيز لوحة المفاتيح بشكل صحيح للحقول بعد إغلاقها (تظهر المشكلة
+// كأن "البرنامج توقف عن كتابة النصوص"). هذي النوافذ المخصصة غير متزامنة (Promise) ولا تسبب هذي المشكلة.
+function showAlert(message) {
+  return new Promise((resolve) => {
+    const modal = $('customAlertModal');
+    if (!modal) { window.alert(message); resolve(); return; }
+    $('customAlertMessage').textContent = message;
+    modal.classList.add('open');
+    const okBtn = $('customAlertOkBtn');
+    const handler = () => {
+      modal.classList.remove('open');
+      okBtn.removeEventListener('click', handler);
+      resolve();
+    };
+    okBtn.addEventListener('click', handler);
+  });
+}
+
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    const modal = $('customConfirmModal');
+    if (!modal) { resolve(window.confirm(message)); return; }
+    $('customConfirmMessage').textContent = message;
+    modal.classList.add('open');
+    const yesBtn = $('customConfirmYesBtn');
+    const noBtn = $('customConfirmNoBtn');
+    const cleanup = (result) => {
+      modal.classList.remove('open');
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+      resolve(result);
+    };
+    const onYes = () => cleanup(true);
+    const onNo = () => cleanup(false);
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+  });
+}
+
+function showPrompt(message, defaultValue) {
+  return new Promise((resolve) => {
+    const modal = $('customPromptModal');
+    if (!modal) { resolve(window.prompt(message, defaultValue)); return; }
+    $('customPromptMessage').textContent = message;
+    const input = $('customPromptInput');
+    input.value = defaultValue != null ? String(defaultValue) : '';
+    modal.classList.add('open');
+    setTimeout(() => { input.focus(); input.select(); }, 30);
+    const okBtn = $('customPromptOkBtn');
+    const cancelBtn = $('customPromptCancelBtn');
+    const onKeydown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); onOk(); }
+      else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+    };
+    const cleanup = (result) => {
+      modal.classList.remove('open');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onKeydown);
+      resolve(result);
+    };
+    const onOk = () => cleanup(input.value);
+    const onCancel = () => cleanup(null);
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    input.addEventListener('keydown', onKeydown);
+  });
+}
+
 // إصلاح مشكلة معروفة بالتطبيقات المبنية على Electron/ويندوز:
 // أحيانًا بعد إغلاق رسالة تنبيه (alert)، مثل "لا يوجد رقم هاتف صالح..."،
 // تفقد نافذة البرنامج التركيز (focus) ويتوقف استقبال الكتابة بجميع الحقول
@@ -143,7 +214,7 @@ $('pendingList') && $('pendingList').addEventListener('click', async (e) => {
   if (!pending) return;
 
   if (btn.dataset.action === 'rejectPending') {
-    if (!confirm('رفض هذا الطلب نهائيًا؟')) return;
+    if (!(await showConfirm('رفض هذا الطلب نهائيًا؟'))) return;
     pendingBookings = await window.api.deletePendingBooking(id);
     updatePendingBadge();
     renderPendingList();
@@ -162,7 +233,7 @@ $('pendingList') && $('pendingList').addEventListener('click', async (e) => {
     pendingBookings = await window.api.deletePendingBooking(id);
     updatePendingBadge();
     switchTab('newBooking');
-    alert('راجع بيانات الحجز وأكملها (السعر وباقي التفاصيل) ثم اضغط "حفظ الحجز".');
+    showAlert('راجع بيانات الحجز وأكملها (السعر وباقي التفاصيل) ثم اضغط "حفظ الحجز".');
   }
 });
 
@@ -321,7 +392,7 @@ $('bookingsTableBody').addEventListener('click', async (e) => {
     loadBookingIntoForm(booking);
     switchTab('newBooking');
   } else if (action === 'delete') {
-    if (confirm(`تأكيد حذف حجز "${booking.customerName}"؟`)) {
+    if (await showConfirm(`تأكيد حذف حجز "${booking.customerName}"؟`)) {
       await window.api.deleteBooking(id);
       bookings = bookings.filter(b => b.id !== id);
       renderBookingsTable();
@@ -413,7 +484,7 @@ function openExternalLink(url) {
 function sendReceiptViaWhatsApp(b) {
   const phone = normalizePhoneForWhatsApp(b.phone);
   if (!phone) {
-    alert('لا يوجد رقم هاتف صالح لهذا العميل لإرسال الوصل عبر واتساب.');
+    showAlert('لا يوجد رقم هاتف صالح لهذا العميل لإرسال الوصل عبر واتساب.');
     return;
   }
   const message = buildReceiptWhatsAppMessage(b);
@@ -431,11 +502,11 @@ async function settleRemainingDebt(id) {
   const remaining = total - paid;
 
   if (remaining <= 0) {
-    alert('لا يوجد مبلغ متبقٍ على هذا الحجز، تم سداد كامل المبلغ.');
+    showAlert('لا يوجد مبلغ متبقٍ على هذا الحجز، تم سداد كامل المبلغ.');
     return;
   }
 
-  const input = prompt(
+  const input = await showPrompt(
     `المبلغ المتبقي على حجز "${booking.customerName}" هو ${formatMoney(remaining)}.\nأدخل المبلغ الذي تريد تسجيله كمسدد الآن:`,
     String(remaining)
   );
@@ -443,7 +514,7 @@ async function settleRemainingDebt(id) {
 
   let amount = Number(input);
   if (!amount || isNaN(amount) || amount <= 0) {
-    alert('الرجاء إدخال مبلغ صحيح أكبر من صفر.');
+    showAlert('الرجاء إدخال مبلغ صحيح أكبر من صفر.');
     return;
   }
   if (amount > remaining) amount = remaining;
@@ -473,7 +544,7 @@ async function settleRemainingDebt(id) {
   if ($('tab-reports').classList.contains('active')) renderReport();
 
   const newRemaining = total - booking.paidAmount;
-  alert(`تم تسجيل دفعة بقيمة ${formatMoney(amount)} على حجز "${booking.customerName}".\nالمتبقي الآن: ${formatMoney(newRemaining)}`);
+  showAlert(`تم تسجيل دفعة بقيمة ${formatMoney(amount)} على حجز "${booking.customerName}".\nالمتبقي الآن: ${formatMoney(newRemaining)}`);
 }
 
 // ---------------- Food Packages (when food prepared inside the hall) ----------------
@@ -694,7 +765,7 @@ $('eventDate').addEventListener('change', () => {
   const currentId = $('bookingId').value || null;
   const conflict = bookings.find(b => b.eventDate === selectedDate && b.id !== currentId);
   if (conflict) {
-    alert(
+    showAlert(
       'تنبيه: هذا التاريخ (' + selectedDate + ') محجوز مسبقًا!\n' +
       'العميل: ' + (conflict.customerName || '—') +
       (conflict.phone ? '\nالهاتف: ' + conflict.phone : '') +
@@ -729,7 +800,7 @@ $('bookingForm').addEventListener('submit', async (e) => {
 
   const dateTaken = bookings.some(b => b.eventDate === booking.eventDate && b.id !== booking.id);
   if (dateTaken) {
-    alert('لا يمكن الحجز: يوجد حجز آخر بنفس التاريخ (' + booking.eventDate + '). القاعة غير متاحة في هذا التاريخ.');
+    showAlert('لا يمكن الحجز: يوجد حجز آخر بنفس التاريخ (' + booking.eventDate + '). القاعة غير متاحة في هذا التاريخ.');
     return;
   }
 
@@ -851,7 +922,7 @@ $('expenseForm').addEventListener('submit', async (e) => {
     notes: $('expenseNotes').value.trim()
   };
   if (!expense.description || !expense.amount || !expense.date) {
-    alert('الرجاء تعبئة الوصف والمبلغ والتاريخ.');
+    showAlert('الرجاء تعبئة الوصف والمبلغ والتاريخ.');
     return;
   }
   const saved = await window.api.saveExpense(expense);
@@ -892,7 +963,7 @@ $('expensesTableBody').addEventListener('click', async (e) => {
   if (action === 'editExpense') {
     loadExpenseIntoForm(expense);
   } else if (action === 'deleteExpense') {
-    if (confirm(`تأكيد حذف مصروف "${expense.description}"؟`)) {
+    if (await showConfirm(`تأكيد حذف مصروف "${expense.description}"؟`)) {
       await window.api.deleteExpense(id);
       expenses = expenses.filter(x => x.id !== id);
       renderExpensesTable();
@@ -1114,12 +1185,12 @@ $('exportExcelBtn').addEventListener('click', async () => {
       ]
     });
     if (result && result.success) {
-      alert('تم حفظ ملف Excel بنجاح في:\n' + result.filePath);
+      showAlert('تم حفظ ملف Excel بنجاح في:\n' + result.filePath);
     } else if (!result || !result.canceled) {
-      alert('تعذّر إنشاء ملف Excel. حاول مرة أخرى.');
+      showAlert('تعذّر إنشاء ملف Excel. حاول مرة أخرى.');
     }
   } catch (err) {
-    alert('تعذّر إنشاء ملف Excel. حاول مرة أخرى.');
+    showAlert('تعذّر إنشاء ملف Excel. حاول مرة أخرى.');
   } finally {
     btn.disabled = false;
     btn.textContent = originalText;
@@ -1305,19 +1376,19 @@ $('logoFileInput').addEventListener('change', async (e) => {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
   if (!file.type || !file.type.startsWith('image/')) {
-    alert('الرجاء اختيار ملف صورة صالح (PNG أو JPEG أو WEBP).');
+    showAlert('الرجاء اختيار ملف صورة صالح (PNG أو JPEG أو WEBP).');
     return;
   }
   try {
     const dataUrl = await resizeImageFileToDataURL(file, 400, 400);
     setLogoPreview(dataUrl);
   } catch (err) {
-    alert('تعذّر معالجة الصورة، حاول بصورة أخرى.');
+    showAlert('تعذّر معالجة الصورة، حاول بصورة أخرى.');
   }
 });
 
-$('removeLogoBtn').addEventListener('click', () => {
-  if (!confirm('هل تريد إزالة شعار القاعة؟')) return;
+$('removeLogoBtn').addEventListener('click', async () => {
+  if (!(await showConfirm('هل تريد إزالة شعار القاعة؟'))) return;
   setLogoPreview('');
 });
 
@@ -1342,7 +1413,7 @@ $('settingsForm').addEventListener('submit', async (e) => {
   await window.api.saveSettings(settings);
   applySettingsToUI();
   renderFoodPackagesChecklist();
-  alert('تم حفظ الإعدادات بنجاح');
+  showAlert('تم حفظ الإعدادات بنجاح');
 });
 
 // ---------------- Backup: Export / Import ----------------
@@ -1376,9 +1447,9 @@ async function exportBackup() {
   if (window.api && window.api.exportBackup) {
     const result = await window.api.exportBackup(jsonString);
     if (result && result.success) {
-      alert('تم حفظ النسخة الاحتياطية بنجاح ✅\n' + (result.filePath || ''));
+      showAlert('تم حفظ النسخة الاحتياطية بنجاح ✅\n' + (result.filePath || ''));
     } else if (result && !result.canceled) {
-      alert('حدث خطأ أثناء حفظ النسخة الاحتياطية: ' + (result.error || 'غير معروف'));
+      showAlert('حدث خطأ أثناء حفظ النسخة الاحتياطية: ' + (result.error || 'غير معروف'));
     }
   } else {
     downloadTextAsFile(jsonString, fileName);
@@ -1417,24 +1488,24 @@ async function importBackupFromText(text) {
   try {
     parsed = JSON.parse(text);
   } catch (err) {
-    alert('تعذّر قراءة الملف، تأكد أنه ملف نسخة احتياطية صحيح بصيغة JSON.');
+    showAlert('تعذّر قراءة الملف، تأكد أنه ملف نسخة احتياطية صحيح بصيغة JSON.');
     return;
   }
 
   const errorMsg = validateBackupPayload(parsed);
   if (errorMsg) {
-    alert(errorMsg);
+    showAlert(errorMsg);
     return;
   }
 
   const bookingsCount = (parsed.bookings || []).length;
-  const confirmed = confirm(
+  const confirmed = await showConfirm(
     `سيتم استيراد ${bookingsCount} حجز/حجوزات، وسيستبدل هذا جميع البيانات الحالية في التطبيق (الحجوزات وإعدادات القاعة).\n\nهل تريد المتابعة؟`
   );
   if (!confirmed) return;
 
   await applyImportedBackup(parsed);
-  alert('تم استيراد النسخة الاحتياطية بنجاح ✅');
+  showAlert('تم استيراد النسخة الاحتياطية بنجاح ✅');
 }
 
 async function importBackup() {
@@ -1442,7 +1513,7 @@ async function importBackup() {
     const result = await window.api.importBackup();
     if (!result || result.canceled) return;
     if (!result.success) {
-      alert('حدث خطأ أثناء قراءة النسخة الاحتياطية: ' + (result.error || 'غير معروف'));
+      showAlert('حدث خطأ أثناء قراءة النسخة الاحتياطية: ' + (result.error || 'غير معروف'));
       return;
     }
     await importBackupFromText(result.data);
@@ -1459,7 +1530,7 @@ $('importBackupFile').addEventListener('change', (e) => {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => importBackupFromText(String(reader.result || ''));
-  reader.onerror = () => alert('تعذّر قراءة الملف المحدد.');
+  reader.onerror = () => showAlert('تعذّر قراءة الملف المحدد.');
   reader.readAsText(file, 'utf-8');
 });
 
@@ -1500,7 +1571,7 @@ if ($('openAutoBackupFolderBtn')) {
     if (window.api && window.api.openAutoBackupFolder) {
       const result = await window.api.openAutoBackupFolder();
       if (!result || !result.success) {
-        alert('تعذّر فتح مجلد النسخ الاحتياطية التلقائية: ' + (result && result.error ? result.error : 'غير معروف'));
+        showAlert('تعذّر فتح مجلد النسخ الاحتياطية التلقائية: ' + (result && result.error ? result.error : 'غير معروف'));
       }
     }
   });
@@ -1653,7 +1724,7 @@ $('previewPrintBtn').addEventListener('click', async () => {
     if (result && result.success) {
       closePrintPreview();
     } else {
-      alert('تعذّرت الطباعة. تأكد من اتصال الطابعة وحاول مرة أخرى.');
+      showAlert('تعذّرت الطباعة. تأكد من اتصال الطابعة وحاول مرة أخرى.');
     }
   } else {
     // Fallback for non-Electron preview
@@ -1678,13 +1749,13 @@ $('previewPdfBtn').addEventListener('click', async () => {
     btn.disabled = false;
     btn.textContent = 'تحويل إلى PDF';
     if (result && result.success) {
-      alert('تم حفظ الملف بنجاح في:\n' + result.filePath);
+      showAlert('تم حفظ الملف بنجاح في:\n' + result.filePath);
       closePrintPreview();
     } else if (!result || !result.canceled) {
-      alert('تعذّر إنشاء ملف PDF. حاول مرة أخرى.');
+      showAlert('تعذّر إنشاء ملف PDF. حاول مرة أخرى.');
     }
   } else {
-    alert('لتحويل الملف إلى PDF، استخدم خيار "حفظ كـ PDF" من نافذة الطباعة.');
+    showAlert('لتحويل الملف إلى PDF، استخدم خيار "حفظ كـ PDF" من نافذة الطباعة.');
     window.print();
     $(previewElementId).classList.remove('active-print');
     btn.disabled = false;

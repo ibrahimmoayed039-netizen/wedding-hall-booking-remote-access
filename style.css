@@ -394,3 +394,12 @@ tbody tr:hover { background: #faf8fd; }
 }
 .logo-preview-img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .logo-upload-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- نوافذ تنبيه/تأكيد مخصصة (بديل alert/confirm الأصلية بالمتصفح) ---------- */
+.custom-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9999; align-items: center; justify-content: center; padding: 20px; }
+.custom-modal-overlay.open { display: flex; }
+.custom-modal-box { background: #fff; border-radius: 14px; padding: 22px 24px; max-width: 420px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,.25); text-align: center; }
+.custom-modal-box p { font-size: 15px; color: #333; line-height: 1.7; white-space: pre-line; margin: 0 0 18px; }
+.custom-modal-actions { display: flex; gap: 10px; justify-content: center; }
+.custom-modal-actions .btn { min-width: 90px; }
+.custom-modal-input { width: 100%; padding: 10px 12px; border: 1px solid #d9d5e3; border-radius: 8px; font-size: 15px; text-align: center; margin-bottom: 18px; box-sizing: border-box; }

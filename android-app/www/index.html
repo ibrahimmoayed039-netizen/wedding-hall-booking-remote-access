@@ -228,7 +228,6 @@
     <button id="closeSettingsBtn" onclick="closeSettings()">إلغاء</button>
   </div>
 
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 let bookings = [];
 let lastSyncedAt = null;
@@ -249,37 +248,34 @@ function apiBase(){
 }
 function getToken(){ return localStorage.getItem('serverToken') || ''; }
 
-// ---------- مسح رمز QR (يعبّي العنوان والرمز تلقائياً ويتصل) ----------
+// ---------- مسح رمز QR مباشر (كاميرا حية عبر ML Kit - يقرأ تلقائي بدون التقاط صورة يدوي) ----------
 async function scanQRCode(){
   try {
-    const CameraPlugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera;
-    if (!CameraPlugin) { alert('تعذر الوصول للكاميرا داخل التطبيق. جرّب تعبئة العنوان والرمز يدوياً بالأسفل.'); return; }
-    if (typeof jsQR !== 'function') {
-      alert('أداة قراءة رمز QR تحتاج تحميل من الإنترنت أول مرة فقط، وما قدرت تتحمّل الآن (تأكد إن الجوال متصل بالإنترنت عادي - وايفاي غير شبكة القاعة أو بيانات الجوال - وحاول مرة ثانية). ممكن أيضاً تعبّي العنوان والرمز يدوياً بالأسفل بدون الحاجة للكاميرا إطلاقاً.');
-      return;
-    }
-    let photo;
+    const BarcodeScannerPlugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BarcodeScanner;
+    if (!BarcodeScannerPlugin) { alert('تعذر الوصول لأداة مسح QR داخل التطبيق. عبّي العنوان والرمز يدوياً بالأسفل.'); return; }
+
     try {
-      photo = await CameraPlugin.getPhoto({
-        resultType: 'dataUrl',
-        source: 'CAMERA',
-        quality: 85,
-        saveToGallery: false,
-        width: 1000
-      });
-    } catch (camErr) {
-      const msg = String((camErr && camErr.message) || camErr || '');
-      if (/permission/i.test(msg)) {
+      const perm = await BarcodeScannerPlugin.requestPermissions();
+      if (perm && perm.camera && perm.camera !== 'granted' && perm.camera !== 'limited') {
         alert('صلاحية الكاميرا غير مفعّلة لهذا التطبيق. افتح إعدادات الجوال → التطبيقات → حجوزات القاعة → الأذونات → فعّل الكاميرا، ثم حاول مرة ثانية. أو عبّي العنوان والرمز يدوياً بالأسفل.');
+        return;
       }
-      // المستخدم ألغى المسح: لا شيء يُعرض
+    } catch (permErr) {
+      // لو تعذر التحقق من الصلاحية بهذي الطريقة نكمل ونخلي scan() نفسها تتعامل مع الرفض
+    }
+
+    let result;
+    try {
+      result = await BarcodeScannerPlugin.scan();
+    } catch (scanErr) {
+      // المستخدم رجع/ألغى المسح، أو خطأ غير متوقع - لا شيء يُعرض
       return;
     }
-    const decoded = await decodeQRFromDataUrl(photo.dataUrl);
-    if (!decoded) {
-      alert('ما قدرنا نقرأ رمز QR بالصورة. جرّب: تأكد إن الرمز كامل وواضح داخل الإطار، إضاءة أفضل، وبدون انعكاس ضوء عليه. أو أسهل: عبّي العنوان والرمز يدوياً بالأسفل (مرة واحدة بس).');
-      return;
-    }
+
+    const barcodes = (result && result.barcodes) || [];
+    if (!barcodes.length) return; // ألغى المستخدم المسح بدون قراءة شي
+
+    const decoded = barcodes[0].rawValue || barcodes[0].displayValue || '';
     const parsed = parseScanResult(decoded);
     if (!parsed) { alert('الرمز الممسوح مو رابط اتصال صحيح (تأكد إنه رمز QR الظاهر بإعدادات البرنامج → الوصول عن بُعد).'); return; }
     document.getElementById('serverAddrInput').value = parsed.addr;
@@ -288,24 +284,6 @@ async function scanQRCode(){
   } catch (err) {
     // خطأ غير متوقع - نتجاهل بصمت (المستخدم يقدر يعبّي يدوياً)
   }
-}
-
-function decodeQRFromDataUrl(dataUrl){
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const result = jsQR(imageData.data, canvas.width, canvas.height);
-      resolve(result ? result.data : null);
-    };
-    img.onerror = () => resolve(null);
-    img.src = dataUrl;
-  });
 }
 
 function parseScanResult(text){

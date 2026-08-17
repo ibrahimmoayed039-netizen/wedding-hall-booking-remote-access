@@ -637,6 +637,35 @@
     </div>
   </div>
 
+  <!-- ===== نوافذ تنبيه/تأكيد مخصصة (بديل alert/confirm الأصلية بالمتصفح - تفادي مشكلة توقف الكتابة بالحقول بعد إغلاقها) ===== -->
+  <div id="customAlertModal" class="custom-modal-overlay">
+    <div class="custom-modal-box">
+      <p id="customAlertMessage"></p>
+      <div class="custom-modal-actions">
+        <button type="button" id="customAlertOkBtn" class="btn btn-primary">حسناً</button>
+      </div>
+    </div>
+  </div>
+  <div id="customConfirmModal" class="custom-modal-overlay">
+    <div class="custom-modal-box">
+      <p id="customConfirmMessage"></p>
+      <div class="custom-modal-actions">
+        <button type="button" id="customConfirmYesBtn" class="btn btn-primary">نعم</button>
+        <button type="button" id="customConfirmNoBtn" class="btn btn-light">إلغاء</button>
+      </div>
+    </div>
+  </div>
+  <div id="customPromptModal" class="custom-modal-overlay">
+    <div class="custom-modal-box">
+      <p id="customPromptMessage"></p>
+      <input type="text" id="customPromptInput" class="custom-modal-input">
+      <div class="custom-modal-actions">
+        <button type="button" id="customPromptOkBtn" class="btn btn-primary">حسناً</button>
+        <button type="button" id="customPromptCancelBtn" class="btn btn-light">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
   <script src="assets/qrcode-vendor.js"></script>
   <script src="remote-access.js"></script>
   <script src="renderer.js"></script>
