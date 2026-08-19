@@ -1,4 +1,4 @@
-name: Build App (Windows + Android)
+name: Build Android APK
 
 on:
   push:
@@ -6,77 +6,62 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ---------- بناء برنامج الويندوز (exe) ----------
-  build-windows:
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build Windows installer
-        run: npm run build
-
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wedding-hall-booking-setup
-          path: dist/*.exe
-
-  # ---------- بناء تطبيق الأندرويد (APK) ----------
-  build-android:
+  build:
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: android-app
-
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
 
-      - name: Setup Java
+      - name: Setup Java (required for Gradle)
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Install dependencies
+      - name: Install project dependencies (Capacitor + ML Kit barcode scanner)
+        working-directory: android-app
         run: npm install
 
-      - name: Add Android platform (if missing)
+      - name: Generate native Android project (if not committed)
+        working-directory: android-app
         run: |
           if [ ! -d "android" ]; then
+            echo "No android/ folder found - generating it now."
             npx cap add android
+          else
+            echo "android/ folder already exists - skipping."
           fi
-          npx cap sync android
 
-      # يسمح للتطبيق بالاتصال بعناوين HTTP العادية داخل الشبكة المحلية أو Radmin VPN
-      - name: Allow cleartext (HTTP) network traffic
+      - name: Sync Capacitor plugins into native project
+        working-directory: android-app
+        run: npx cap sync android
+
+      - name: Verify camera permission was added by ML Kit sync
+        working-directory: android-app
         run: |
-          sed -i 's/<application/<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if grep -q "android.permission.CAMERA" "$MANIFEST"; then
+            echo "Camera permission present in AndroidManifest.xml."
+          else
+            echo "Camera permission missing - adding it manually as a safety net."
+            sed -i 's#<application#<uses-permission android:name="android.permission.CAMERA" />\n    <application#' "$MANIFEST"
+          fi
+
+      - name: Grant execute permission for gradlew
+        working-directory: android-app/android
+        run: chmod +x gradlew
 
       - name: Build debug APK
         working-directory: android-app/android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
+        run: ./gradlew assembleDebug
 
-      - name: Upload Android artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hall-bookings-viewer-apk
+          name: app-debug
           path: android-app/android/app/build/outputs/apk/debug/app-debug.apk
