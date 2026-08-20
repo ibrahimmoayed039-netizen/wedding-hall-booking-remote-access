@@ -64,6 +64,17 @@ jobs:
         working-directory: android-app
         run: npx cap sync android
 
+      - name: Allow cleartext (http://) traffic to reach the local server
+        working-directory: android-app
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if grep -q 'usesCleartextTraffic' "$MANIFEST"; then
+            echo "usesCleartextTraffic already present."
+          else
+            echo "Adding android:usesCleartextTraffic=\"true\" to allow http:// connections."
+            sed -i 's#<application#<application\n        android:usesCleartextTraffic="true"#' "$MANIFEST"
+          fi
+
       - name: Verify camera permission was added by ML Kit sync
         working-directory: android-app
         run: |
